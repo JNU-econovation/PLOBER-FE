@@ -69,8 +69,12 @@ export function usePloggingTimer() {
 
   const resume = () => {
     if (pausedAt === null) return;
-    setPausedTotalMs((prev) => prev + (Date.now() - pausedAt));
+    const resumedAt = Date.now();
+    setPausedTotalMs((prev) => prev + (resumedAt - pausedAt));
     setPausedAt(null);
+    // 일시정지 동안 멈춰 있던 now를 즉시 보정.
+    // 안 그러면 재개 직후 첫 1초 동안 stale한 now로 elapsed가 잠깐 뒤로 점프한다.
+    setNow(resumedAt);
   };
 
   const toggle = () => {
