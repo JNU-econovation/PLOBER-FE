@@ -22,7 +22,11 @@ export function ReportScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingTop: Math.max(insets.top, 44) + 8 },
+          { 
+            paddingTop: Math.max(insets.top, 44) + 16,
+            // 🌟 하단 PrimaryButton 높이 + Safe Area만큼 스크롤 여백 동적 확보
+            paddingBottom: Math.max(insets.bottom, 30) + 120 
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >

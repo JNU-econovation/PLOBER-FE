@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
 import { PloggingMap } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -16,24 +16,29 @@ import { activeStats } from "../data/activity-data";
 
 export function ActivePloggingScreen() {
   const router = useRouter();
-
+  const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
   return (
     <ScreenRoot>
       <PloggingMap dimmed zoom={17}>
-        <PloggingTimerCard />
-        <MapControls top={218} />
+        {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
+        <PloggingTimerCard top={Math.max(insets.top, 44) + 16} />
+        <MapControls top={Math.max(insets.top, 44) + 160} />
         <View style={styles.centerPin}>
           <RoutePin large />
         </View>
-        <ActionDock onEnd={() => router.push("/report")} />
+        {/* 하단 제스처 바 영역을 고려하여 bottom 위치 동적 할당 */}
+        <ActionDock 
+          bottom={Math.max(insets.bottom, 24) + 24} 
+          onEnd={() => router.push("/report")} 
+        />
       </PloggingMap>
     </ScreenRoot>
   );
 }
 
-function PloggingTimerCard() {
+function PloggingTimerCard({ top }: { top: number }) {
   return (
-    <View style={styles.timerCard}>
+    <View style={[styles.timerCard, { top }]}>
       <Text selectable style={styles.modeLabel}>
         자유모드
       </Text>
@@ -57,9 +62,9 @@ function PloggingTimerCard() {
   );
 }
 
-function ActionDock({ onEnd }: { onEnd: () => void }) {
+function ActionDock({ onEnd, bottom }: { onEnd: () => void; bottom: number }){
   return (
-    <View style={styles.actionDock}>
+    <View style={[styles.actionDock, { bottom }]}>
       <Pressable
         accessibilityLabel="사진 촬영"
         accessibilityRole="button"
@@ -105,7 +110,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: 24,
-    bottom: 27,
+    // bottom: 27,
     flexDirection: "row",
     gap: 10,
     height: 71,
@@ -197,7 +202,7 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     position: "absolute",
     right: 24,
-    top: 62,
+    // top: 62,
     height: 131,
     ...shadows.raised,
   },
