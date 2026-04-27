@@ -1,7 +1,8 @@
-import type { ComponentProps } from "react";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, View } from "react-native";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import type { ComponentProps } from "react";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, shadows } from "../theme";
 
@@ -37,8 +38,17 @@ export function PloggingTabBar({
   navigation,
   state,
 }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const paddingBottom = Platform.OS === 'android' ? Math.max(insets.bottom, 16) : insets.bottom;
   return (
-    <View accessibilityRole="tablist" style={styles.bottomTabs}>
+    <View accessibilityRole="tablist" style={[
+        styles.bottomTabs, 
+        { 
+          paddingBottom,
+          // 패딩이 추가된 만큼 전체 높이도 유동적으로 늘려줍니다
+          height: 60 + paddingBottom 
+        }
+      ]}>
       {state.routes.map((route, index) => {
         const selected = state.index === index;
         const config = tabConfig[route.name];
@@ -96,7 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     bottom: 0,
     flexDirection: "row",
-    height: 83,
+    // height: 83, <- 이 고정 높이 삭제 (위에서 동적 계산함)
     justifyContent: "space-between",
     left: 0,
     paddingHorizontal: 34,
