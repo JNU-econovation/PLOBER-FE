@@ -48,10 +48,15 @@ function PloggingTimerCard({ top }: { top: number }) {
       <View style={styles.statsRow}>
         {activeStats.map((stat, index) => (
           <View key={stat.label} style={styles.statItem}>
-            <Text selectable style={styles.statLabel}>
+            <Text numberOfLines={1} selectable style={styles.statLabel}>
               {stat.label}
             </Text>
-            <StatNumber size={16} unit={stat.unit} value={stat.value} />
+            <StatNumber
+              numberOfLines={1}
+              size={16}
+              unit={stat.unit}
+              value={stat.value}
+            />
             {index < activeStats.length - 1 ? (
               <View style={styles.statDivider} />
             ) : null}
@@ -174,13 +179,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.line,
     height: 29,
     position: "absolute",
-    right: -10,
+    right: -6,
     top: 2,
     width: 1,
   },
   statItem: {
     flex: 1,
     gap: 6,
+    minWidth: 0,
     position: "relative",
   },
   statLabel: {
@@ -191,19 +197,18 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
-    gap: 20,
-    marginTop: 20,
+    gap: 12,
+    marginTop: 16,
   },
   timerCard: {
     backgroundColor: colors.surface,
     borderRadius: 24,
     left: 24,
-    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingHorizontal: 18,
     paddingTop: 14,
     position: "absolute",
     right: 24,
-    // top: 62,
-    height: 131,
     ...shadows.raised,
   },
   timerText: {

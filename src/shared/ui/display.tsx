@@ -13,13 +13,21 @@ export function StatNumber({
   value,
   unit,
   size = 24,
+  numberOfLines,
 }: {
   value: string;
   unit?: string;
   size?: number;
+  numberOfLines?: number;
 }) {
   return (
-    <Text selectable style={[styles.statNumber, { fontSize: size }]}>
+    <Text
+      selectable
+      adjustsFontSizeToFit={numberOfLines === 1}
+      minimumFontScale={0.7}
+      numberOfLines={numberOfLines}
+      style={[styles.statNumber, { fontSize: size }]}
+    >
       {value}
       {unit ? <Text style={styles.statUnit}> {unit}</Text> : null}
     </Text>

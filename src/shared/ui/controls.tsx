@@ -74,6 +74,9 @@ export function PrimaryBottomButton({
   style?: StyleProp<ViewStyle>;
 }) {
   const insets = useSafeAreaInsets();
+  // 콘텐츠 시각 영역(텍스트 위/아래 공간)과 safe-area 인셋을 분리해서
+  // 모든 기기에서 텍스트가 항상 동일하게 가운데 보이도록 한다.
+  const visualPadding = 22;
 
   return (
     <Pressable
@@ -83,10 +86,9 @@ export function PrimaryBottomButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.primaryBottomButton,
-        // 🌟 Safe Area를 고려하여 하단 여백을 주고, 버튼의 전체 높이도 동적으로 늘려줍니다.
-        { 
-          paddingBottom: Math.max(insets.bottom, 20),
-          minHeight: 68 + Math.max(insets.bottom, 20)
+        {
+          paddingTop: visualPadding,
+          paddingBottom: visualPadding + insets.bottom,
         },
         pressed ? styles.primaryPressed : null,
         style,
@@ -192,10 +194,7 @@ const styles = StyleSheet.create<{
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     bottom: 0,
-    // justifyContent: "center",
     left: 0,
-    // minHeight: 98,
-    paddingTop: 24,
     position: "absolute",
     right: 0,
     ...shadows.button,
