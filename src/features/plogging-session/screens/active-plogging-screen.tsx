@@ -22,7 +22,8 @@ export function ActivePloggingScreen() {
       <PloggingMap dimmed zoom={17}>
         {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
         <PloggingTimerCard top={Math.max(insets.top, 44) + 16} />
-        <MapControls top={Math.max(insets.top, 44) + 160} />
+        {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
+        <MapControls top={Math.max(insets.top, 44) + 184} />
         <View style={styles.centerPin}>
           <RoutePin large />
         </View>
