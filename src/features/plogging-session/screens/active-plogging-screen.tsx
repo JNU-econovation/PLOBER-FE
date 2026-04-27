@@ -7,44 +7,65 @@ import {
   CameraGlyph,
   MapControls,
   PauseGlyph,
+  PlayGlyph,
   RoutePin,
   ScreenRoot,
   StatNumber,
 } from "@/src/shared/ui";
 
 import { activeStats } from "../data/activity-data";
+import { usePloggingTimer } from "../hooks/use-plogging-timer";
 
 export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
+  const timer = usePloggingTimer();
+
   return (
     <ScreenRoot>
       <PloggingMap dimmed zoom={17}>
         {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
-        <PloggingTimerCard top={Math.max(insets.top, 44) + 16} />
+        <PloggingTimerCard
+          formattedElapsed={timer.formatted}
+          top={Math.max(insets.top, 44) + 16}
+        />
         {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
         <MapControls top={Math.max(insets.top, 44) + 184} />
         <View style={styles.centerPin}>
           <RoutePin large />
         </View>
         {/* 하단 제스처 바 영역을 고려하여 bottom 위치 동적 할당 */}
-        <ActionDock 
-          bottom={Math.max(insets.bottom, 24) + 24} 
-          onEnd={() => router.push("/report")} 
+        <ActionDock
+          bottom={Math.max(insets.bottom, 24) + 24}
+          isPaused={timer.isPaused}
+          onEnd={() => router.push("/report")}
+          onTogglePause={timer.toggle}
         />
       </PloggingMap>
     </ScreenRoot>
   );
 }
 
-function PloggingTimerCard({ top }: { top: number }) {
+function PloggingTimerCard({
+  top,
+  formattedElapsed,
+}: {
+  top: number;
+  formattedElapsed: string;
+}) {
   return (
     <View style={[styles.timerCard, { top }]}>
       <Text selectable style={styles.modeLabel}>
         자유모드
       </Text>
-      <Text selectable style={styles.timerText}>
-        14 : 17
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        numberOfLines={1}
+        selectable
+        style={styles.timerText}
+      >
+        {formattedElapsed}
       </Text>
       <View style={styles.statsRow}>
         {activeStats.map((stat, index) => (
@@ -68,7 +89,18 @@ function PloggingTimerCard({ top }: { top: number }) {
   );
 }
 
-function ActionDock({ onEnd, bottom }: { onEnd: () => void; bottom: number }){
+function ActionDock({
+  onEnd,
+  bottom,
+  isPaused,
+  onTogglePause,
+}: {
+  onEnd: () => void;
+  bottom: number;
+  isPaused: boolean;
+  onTogglePause: () => void;
+}) {
+  const pauseLabel = isPaused ? "재개" : "일시 정지";
   return (
     <View style={[styles.actionDock, { bottom }]}>
       <Pressable
@@ -80,17 +112,18 @@ function ActionDock({ onEnd, bottom }: { onEnd: () => void; bottom: number }){
         <CameraGlyph light />
       </Pressable>
       <Pressable
-        accessibilityLabel="일시 정지"
+        accessibilityLabel={pauseLabel}
         accessibilityRole="button"
         hitSlop={8}
+        onPress={onTogglePause}
         style={({ pressed }) => [
           styles.pauseButton,
           pressed ? styles.pressed : null,
         ]}
       >
-        <PauseGlyph />
+        {isPaused ? <PlayGlyph /> : <PauseGlyph />}
         <Text selectable style={styles.pauseText}>
-          일시 정지
+          {pauseLabel}
         </Text>
       </Pressable>
       <Pressable

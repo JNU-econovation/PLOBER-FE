@@ -90,6 +90,10 @@ export function PauseGlyph() {
   return <MaterialCommunityIcons color={colors.icon} name="pause" size={18} />;
 }
 
+export function PlayGlyph() {
+  return <MaterialCommunityIcons color={colors.icon} name="play" size={18} />;
+}
+
 const styles = StyleSheet.create<{
   statNumber: TextStyle;
   statUnit: TextStyle;
