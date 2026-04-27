@@ -52,7 +52,13 @@ function MonthlySummaryHero() {
       <Text selectable style={styles.monthLabel}>
         4월달 누적
       </Text>
-      <Text selectable style={styles.totalSteps}>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        numberOfLines={1}
+        selectable
+        style={styles.totalSteps}
+      >
         20,041<Text style={styles.totalUnit}> 걸음</Text>
       </Text>
       <View style={styles.heroLine} />
@@ -75,11 +81,17 @@ function SummaryMetric({
   value: string;
 }) {
   return (
-    <View>
-      <Text selectable style={styles.heroValue}>
+    <View style={styles.heroMetric}>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        numberOfLines={1}
+        selectable
+        style={styles.heroValue}
+      >
         {value} <Text style={styles.heroUnit}>{unit}</Text>
       </Text>
-      <Text selectable style={styles.heroCaption}>
+      <Text numberOfLines={1} selectable style={styles.heroCaption}>
         {caption}
       </Text>
     </View>
@@ -190,8 +202,13 @@ const styles = StyleSheet.create({
     height: 1,
     marginTop: 10,
   },
+  heroMetric: {
+    flex: 1,
+    minWidth: 0,
+  },
   heroStats: {
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
     marginTop: 10,
   },
@@ -272,9 +289,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#57AE71",
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    height: 200,
+    paddingBottom: 24,
     paddingHorizontal: 40,
-    paddingTop: 48,
+    paddingTop: 32,
     ...shadows.soft,
   },
   totalSteps: {
