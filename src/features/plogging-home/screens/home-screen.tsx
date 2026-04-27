@@ -1,7 +1,3 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { PloggingMap } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -11,22 +7,32 @@ import {
   ScreenRoot,
   type PloggingMode,
 } from "@/src/shared/ui";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
 
 export function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   const [mode, setMode] = useState<PloggingMode>("ai");
 
   const handleStart = () => {
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
+  // 하단 탭 바가 차지하는 높이를 대략적으로 계산 (안드로이드 제스처바 포함)
+  const bottomNavHeight = Math.max(insets.bottom, 16) + 60;
 
   return (
     <ScreenRoot>
       <PloggingMap dimmed>
         <ModeSwitch onChange={setMode} value={mode} />
-        <MapControls top={176} />
+        {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
+        <MapControls top={Math.max(insets.top, 44) + 80} />
+        
         <View style={styles.bottomFade} />
-        <Text selectable style={styles.reportLabel}>
+        
+        <Text selectable style={[styles.reportLabel, { bottom: bottomNavHeight + 90 }]}>
           쓰레기 제보
         </Text>
         <Pressable
@@ -35,11 +41,13 @@ export function HomeScreen() {
           hitSlop={8}
           style={({ pressed }) => [
             styles.reportButton,
+            { bottom: bottomNavHeight + 20 }, // 탭 바 위로 배치
             pressed ? styles.pressed : null,
           ]}
         >
           <CameraGlyph light />
         </Pressable>
+        
         <Pressable
           accessibilityLabel="플로깅 시작"
           accessibilityRole="button"
@@ -47,6 +55,7 @@ export function HomeScreen() {
           onPress={handleStart}
           style={({ pressed }) => [
             styles.startButton,
+            { bottom: bottomNavHeight + 10 }, // 탭 바 위로 중앙 배치
             pressed ? styles.startButtonPressed : null,
           ]}
         >

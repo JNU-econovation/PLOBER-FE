@@ -1,5 +1,5 @@
-import type { ComponentProps } from "react";
 import { Feather } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -102,8 +102,16 @@ export function ModeSwitch({
   value: PloggingMode;
   onChange: (value: PloggingMode) => void;
 }) {
+  const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   return (
-    <View accessibilityRole="tablist" style={styles.modeSwitch}>
+    <View 
+      accessibilityRole="tablist" 
+      style={[
+        styles.modeSwitch,
+        // 기기별 상단 노치 영역을 계산하여 top 위치 동적 설정
+        { top: Math.max(insets.top, 44) + 16 } 
+      ]}
+    >
       <ModeOption
         label="자유모드"
         selected={value === "free"}
