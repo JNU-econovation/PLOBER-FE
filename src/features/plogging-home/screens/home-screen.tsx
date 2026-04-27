@@ -7,10 +7,15 @@ import {
   ScreenRoot,
   type PloggingMode,
 } from "@/src/shared/ui";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
+
+// 시작 버튼 + 위/아래 같은 간격(41px)까지는 솔리드, 그 위로는 페이드
+const START_BUTTON_HEIGHT = 96;
+const FADE_GRADIENT_HEIGHT = 80;
 
 export function HomeScreen() {
   const router = useRouter();
@@ -20,8 +25,18 @@ export function HomeScreen() {
   const handleStart = () => {
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
-  // 하단 탭 바가 차지하는 높이를 대략적으로 계산 (안드로이드 제스처바 포함)
-  const bottomNavHeight = Math.max(insets.bottom, 16) + 60;
+  // 탭바 실제 높이(navigation.tsx의 PloggingTabBar와 동일 공식)
+  const tabBarHeight = Math.max(insets.bottom, 16) + 60;
+  // 시안 기준 탭바 위 간격을 그대로 유지(safe-area 기기에서도 동일한 시각 비율)
+  const startButtonOffset = 41;
+  const reportButtonOffset = 63;
+  const reportLabelOffset = 131;
+
+  // 솔리드 흰색 구간: 탭바 위 → 시작 버튼 위쪽으로 같은 간격까지
+  const fadeSolidHeight =
+    startButtonOffset + START_BUTTON_HEIGHT + startButtonOffset;
+  const fadeTotalHeight = fadeSolidHeight + FADE_GRADIENT_HEIGHT;
+  const solidStopRatio = FADE_GRADIENT_HEIGHT / fadeTotalHeight;
 
   return (
     <ScreenRoot>
@@ -29,10 +44,25 @@ export function HomeScreen() {
         <ModeSwitch onChange={setMode} value={mode} />
         {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
         <MapControls top={Math.max(insets.top, 44) + 80} />
-        
-        <View style={styles.bottomFade} />
-        
-        <Text selectable style={[styles.reportLabel, { bottom: bottomNavHeight + 90 }]}>
+
+        <LinearGradient
+          colors={[
+            "rgba(255, 255, 255, 0)",
+            "rgba(255, 255, 255, 0.92)",
+            "rgba(255, 255, 255, 0.92)",
+          ]}
+          locations={[0, solidStopRatio, 1]}
+          pointerEvents="none"
+          style={[
+            styles.bottomFade,
+            { bottom: tabBarHeight, height: fadeTotalHeight },
+          ]}
+        />
+
+        <Text
+          selectable
+          style={[styles.reportLabel, { bottom: tabBarHeight + reportLabelOffset }]}
+        >
           쓰레기 제보
         </Text>
         <Pressable
@@ -41,13 +71,13 @@ export function HomeScreen() {
           hitSlop={8}
           style={({ pressed }) => [
             styles.reportButton,
-            { bottom: bottomNavHeight + 20 }, // 탭 바 위로 배치
+            { bottom: tabBarHeight + reportButtonOffset },
             pressed ? styles.pressed : null,
           ]}
         >
           <CameraGlyph light />
         </Pressable>
-        
+
         <Pressable
           accessibilityLabel="플로깅 시작"
           accessibilityRole="button"
@@ -55,7 +85,7 @@ export function HomeScreen() {
           onPress={handleStart}
           style={({ pressed }) => [
             styles.startButton,
-            { bottom: bottomNavHeight + 10 }, // 탭 바 위로 중앙 배치
+            { bottom: tabBarHeight + startButtonOffset },
             pressed ? styles.startButtonPressed : null,
           ]}
         >
@@ -70,9 +100,6 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   bottomFade: {
-    backgroundColor: "rgba(255, 255, 255, 0.92)",
-    bottom: 83,
-    height: 234,
     left: 0,
     pointerEvents: "none",
     position: "absolute",
@@ -84,7 +111,6 @@ const styles = StyleSheet.create({
   },
   reportButton: {
     alignItems: "center",
-    bottom: 146,
     height: 62,
     justifyContent: "center",
     position: "absolute",
@@ -92,7 +118,6 @@ const styles = StyleSheet.create({
     width: 62,
   },
   reportLabel: {
-    bottom: 214,
     color: colors.text,
     fontSize: 12,
     fontWeight: "500",
@@ -104,7 +129,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     backgroundColor: colors.primary,
     borderRadius: 48,
-    bottom: 124,
     height: 96,
     justifyContent: "center",
     position: "absolute",
