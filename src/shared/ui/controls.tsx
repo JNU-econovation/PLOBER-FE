@@ -83,7 +83,11 @@ export function PrimaryBottomButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.primaryBottomButton,
-        { paddingBottom: Math.max(insets.bottom, 30) },
+        // 🌟 Safe Area를 고려하여 하단 여백을 주고, 버튼의 전체 높이도 동적으로 늘려줍니다.
+        { 
+          paddingBottom: Math.max(insets.bottom, 20),
+          minHeight: 68 + Math.max(insets.bottom, 20)
+        },
         pressed ? styles.primaryPressed : null,
         style,
       ]}
@@ -188,10 +192,10 @@ const styles = StyleSheet.create<{
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     bottom: 0,
-    justifyContent: "center",
+    // justifyContent: "center",
     left: 0,
-    minHeight: 98,
-    paddingTop: 10,
+    // minHeight: 98,
+    paddingTop: 24,
     position: "absolute",
     right: 0,
     ...shadows.button,
