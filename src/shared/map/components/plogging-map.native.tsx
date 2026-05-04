@@ -4,6 +4,7 @@ import {
   NaverMapView,
 } from "@mj-studio/react-native-naver-map";
 
+import { colors } from "../../theme";
 import { CAMPUS_CAMERA, ROUTE_COORDS } from "../data/map-data";
 import type { PloggingMapProps } from "./types";
 
@@ -24,7 +25,7 @@ export function PloggingMap({
       >
         {routeVisible ? (
           <NaverMapPolylineOverlay
-            color="#40A461"
+            color={colors.primary}
             coords={ROUTE_COORDS}
             width={8}
           />
