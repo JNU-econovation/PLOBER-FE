@@ -7,9 +7,9 @@ export const colors = {
   muted: "#757575",
   subtle: "#A7A7A7",
   line: "#E6E6E6",
-  primary: "#40A461",
-  primaryDark: "#47905A",
-  primarySoft: "#F0FAF3",
+  primary: "#449DDD",
+  primaryDark: "#1B6CAE",
+  primarySoft: "#8DC3EC",
   danger: "#FF5F6A",
   icon: "#222222",
 } as const;
