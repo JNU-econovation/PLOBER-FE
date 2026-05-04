@@ -9,7 +9,7 @@
 - Framework: Flutter (Dart)
 - Map SDK: Naver Map SDK (Proposed)
 - Backend: Python (FastAPI/Django) - RAG & Path Optimization logic
-- Design: Clean & Minimal UI (Green point color)
+- Design: Clean & Minimal UI (Main color: #449DDD)
 
 ## 🗺 Core Features (UI Based)
 
@@ -33,10 +33,19 @@
 ## 📜 Development Rules
 
 - Naming: 클래스명은 PascalCase, 변수 및 함수명은 camelCase 사용.
-- UI: 디자인 시안의 'Green' 포인트 컬러(#4CAF50 계열)를 엄격히 준수.
+- UI: 메인 컬러 `#449DDD`를 엄격히 준수. (배경, 포인트, 주요 버튼 등 베이스 톤)
 - State Management: Provider 또는 Riverpod 사용 (논의 필요).
 - Communication: 모든 API 요청은 services/ 폴더 내에서 관리.
 - Git: 커밋 메시지는 한글 사용 권장 (예: [Feat] AI 경로 추천 카드 UI 구현).
+
+## 🔁 Code Change Workflow
+
+코드 수정 요청을 받으면 아래 순서를 반드시 따른다:
+
+1. **이슈 내용 제안**: 작업 시작 전, GitHub Issue에 등록할 제목/본문(배경, 작업 항목, 완료 기준)을 한글로 먼저 제시한다.
+2. **브랜치 전략 안내**: 어떤 브랜치(`feat/...`, `fix/...`, `refactor/...` 등)에서, 어떤 베이스 브랜치(`main`)로부터 작업해야 하는지 안내한다. 브랜치는 사용자가 직접 생성/체크아웃한다.
+3. **개발 수행 대기 → 실행**: 사용자가 브랜치 변경을 마쳤다고 알리면, 그 뒤에 실제 코드 수정을 진행한다.
+4. **커밋 메시지 + PR 본문 작성**: 작업이 끝나면 Conventional Commits 형식의 커밋 메시지(한글 설명)와 PR 본문(요약 / 변경 사항 / 테스트 방법)을 함께 제시한다.
 
 🚀 Recent Focus
 
