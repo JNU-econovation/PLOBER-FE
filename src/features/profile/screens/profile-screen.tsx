@@ -245,7 +245,7 @@ function formatMonthKey(year: number, month: number) {
 
 const styles = StyleSheet.create({
   activityDot: {
-    backgroundColor: "#6CB480",
+    backgroundColor: colors.primarySoft,
     borderRadius: 3,
     height: 6,
     marginTop: 13,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   },
   levelBadge: {
     alignItems: "center",
-    backgroundColor: "#57AE71",
+    backgroundColor: colors.primary,
     borderRadius: 17,
     height: 18,
     justifyContent: "center",
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   progressFill: {
-    backgroundColor: "#57AE71",
+    backgroundColor: colors.primary,
     height: 4,
     width: "78%",
   },

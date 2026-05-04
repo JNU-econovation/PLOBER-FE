@@ -336,14 +336,14 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   progressFill: {
-    backgroundColor: "#57AE71",
+    backgroundColor: colors.primary,
     borderRadius: 7,
     height: 5,
     width: "82%",
   },
   progressMarker: {
     bottom: -14,
-    color: "#57AE71",
+    color: colors.primary,
     fontSize: 10,
     position: "absolute",
     right: "16%",

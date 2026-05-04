@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -48,7 +49,12 @@ export function HistoryScreen() {
 
 function MonthlySummaryHero() {
   return (
-    <View style={styles.summaryHero}>
+    <LinearGradient
+      colors={["#72BDF3", "#449DDD"]}
+      end={{ x: 1, y: 0.5 }}
+      start={{ x: 0, y: 0.5 }}
+      style={styles.summaryHero}
+    >
       <Text selectable style={styles.monthLabel}>
         4월달 누적
       </Text>
@@ -67,7 +73,7 @@ function MonthlySummaryHero() {
         <SummaryMetric caption="칼로리" unit="K" value="20.3" />
         <SummaryMetric caption="플로깅" unit="회" value="5" />
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -286,7 +292,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   summaryHero: {
-    backgroundColor: "#57AE71",
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     paddingBottom: 24,

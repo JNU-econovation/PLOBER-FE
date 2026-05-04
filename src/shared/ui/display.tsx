@@ -194,7 +194,7 @@ const styles = StyleSheet.create<{
   },
   levelBadge: {
     alignItems: "center",
-    backgroundColor: "#57AE71",
+    backgroundColor: colors.primary,
     borderRadius: 17,
     height: 20,
     justifyContent: "center",
