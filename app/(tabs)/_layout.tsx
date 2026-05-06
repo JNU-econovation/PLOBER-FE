@@ -1,8 +1,15 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 
+import { useAuthSession } from "@/src/features/auth";
 import { PloggingTabBar } from "@/src/shared/ui";
 
 export default function TabLayout() {
+  const { status } = useAuthSession();
+
+  if (status === "unauthenticated") {
+    return <Redirect href="/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{ headerShown: false }}

@@ -1,5 +1,7 @@
 import type { AxiosError, AxiosInstance } from "axios";
 
+import { getSession } from "@/src/shared/auth";
+
 import { ApiError } from "./types";
 
 type ServerErrorBody = {
@@ -9,9 +11,10 @@ type ServerErrorBody = {
 
 export function attachInterceptors(client: AxiosInstance): void {
   client.interceptors.request.use(async (config) => {
-    // TODO(kakao-oauth): 카카오 OAuth 도입 시 Authorization 헤더 주입
-    // const token = await getKakaoAccessToken();
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
+    const session = await getSession();
+    if (session?.accessToken) {
+      config.headers.Authorization = `${session.tokenType} ${session.accessToken}`;
+    }
     return config;
   });
 
