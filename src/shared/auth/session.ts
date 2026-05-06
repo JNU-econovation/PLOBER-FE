@@ -1,7 +1,8 @@
 import { Platform } from "react-native";
-import * as SecureStore from "expo-secure-store";
+import { requireOptionalNativeModule } from "expo-modules-core";
 
 const AUTH_SESSION_KEY = "plober_auth_session";
+const SECURE_STORE_OPTIONS = {};
 
 export type AuthSession = {
   accessToken: string;
@@ -10,6 +11,29 @@ export type AuthSession = {
   nickname: string;
   email: string;
 };
+
+type SecureStoreModule = {
+  deleteValueWithKeyAsync: (key: string, options?: object) => Promise<void>;
+  getValueWithKeyAsync: (key: string, options?: object) => Promise<string | null>;
+  setValueWithKeyAsync: (
+    value: string,
+    key: string,
+    options?: object
+  ) => Promise<void>;
+};
+
+let secureStoreModule: SecureStoreModule | null | undefined;
+let memorySession: AuthSession | null = null;
+
+function getSecureStoreModule(): SecureStoreModule | null {
+  if (Platform.OS === "web") return null;
+  if (secureStoreModule !== undefined) return secureStoreModule;
+
+  secureStoreModule =
+    requireOptionalNativeModule<SecureStoreModule>("ExpoSecureStore");
+
+  return secureStoreModule;
+}
 
 function readWebSession(): AuthSession | null {
   if (typeof localStorage === "undefined") return null;
@@ -25,23 +49,61 @@ function readWebSession(): AuthSession | null {
   }
 }
 
-async function isSecureStoreAvailable() {
-  if (Platform.OS === "web") return false;
-  return SecureStore.isAvailableAsync();
-}
-
-export async function getSession(): Promise<AuthSession | null> {
-  if (!(await isSecureStoreAvailable())) {
+function readFallbackSession(): AuthSession | null {
+  if (Platform.OS === "web") {
     return readWebSession();
   }
 
-  const rawSession = await SecureStore.getItemAsync(AUTH_SESSION_KEY);
+  return memorySession;
+}
+
+function writeFallbackSession(session: AuthSession): void {
+  if (Platform.OS === "web") {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    }
+    return;
+  }
+
+  memorySession = session;
+}
+
+function clearFallbackSession(): void {
+  if (Platform.OS === "web") {
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+    }
+    return;
+  }
+
+  memorySession = null;
+}
+
+async function isSecureStoreAvailable() {
+  const secureStore = getSecureStoreModule();
+  if (!secureStore) return false;
+  return typeof secureStore.getValueWithKeyAsync === "function";
+}
+
+export async function getSession(): Promise<AuthSession | null> {
+  const secureStore = getSecureStoreModule();
+  if (!(await isSecureStoreAvailable())) {
+    return readFallbackSession();
+  }
+
+  const rawSession = await secureStore?.getValueWithKeyAsync(
+    AUTH_SESSION_KEY,
+    SECURE_STORE_OPTIONS
+  );
   if (!rawSession) return null;
 
   try {
     return JSON.parse(rawSession) as AuthSession;
   } catch {
-    await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
+    await secureStore?.deleteValueWithKeyAsync(
+      AUTH_SESSION_KEY,
+      SECURE_STORE_OPTIONS
+    );
     return null;
   }
 }
@@ -49,23 +111,28 @@ export async function getSession(): Promise<AuthSession | null> {
 export async function saveSession(session: AuthSession): Promise<void> {
   const serializedSession = JSON.stringify(session);
 
+  const secureStore = getSecureStoreModule();
   if (!(await isSecureStoreAvailable())) {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem(AUTH_SESSION_KEY, serializedSession);
-    }
+    writeFallbackSession(session);
     return;
   }
 
-  await SecureStore.setItemAsync(AUTH_SESSION_KEY, serializedSession);
+  await secureStore?.setValueWithKeyAsync(
+    serializedSession,
+    AUTH_SESSION_KEY,
+    SECURE_STORE_OPTIONS
+  );
 }
 
 export async function clearSession(): Promise<void> {
+  const secureStore = getSecureStoreModule();
   if (!(await isSecureStoreAvailable())) {
-    if (typeof localStorage !== "undefined") {
-      localStorage.removeItem(AUTH_SESSION_KEY);
-    }
+    clearFallbackSession();
     return;
   }
 
-  await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
+  await secureStore?.deleteValueWithKeyAsync(
+    AUTH_SESSION_KEY,
+    SECURE_STORE_OPTIONS
+  );
 }

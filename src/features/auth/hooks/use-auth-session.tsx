@@ -13,12 +13,12 @@ import {
   getSession,
   type AuthSession,
 } from "../services/session";
-import { startKakaoLogin } from "../services/kakao-auth";
+import { completeKakaoLogin } from "../services/kakao-auth";
 
 type AuthSessionContextValue = {
   clearAuthSession: () => Promise<void>;
+  completeKakaoLoginWithCode: (code: string) => Promise<AuthSession>;
   session: AuthSession | null;
-  signInWithKakao: () => Promise<AuthSession>;
   status: "loading" | "authenticated" | "unauthenticated";
 };
 
@@ -44,8 +44,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signInWithKakao = useCallback(async () => {
-    const nextSession = await startKakaoLogin();
+  const completeKakaoLoginWithCode = useCallback(async (code: string) => {
+    const nextSession = await completeKakaoLogin(code);
     setSession(nextSession);
     return nextSession;
   }, []);
@@ -58,15 +58,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthSessionContextValue>(
     () => ({
       clearAuthSession,
+      completeKakaoLoginWithCode,
       session,
-      signInWithKakao,
       status: loading
         ? "loading"
         : session
           ? "authenticated"
           : "unauthenticated",
     }),
-    [clearAuthSession, loading, session, signInWithKakao]
+    [clearAuthSession, completeKakaoLoginWithCode, loading, session]
   );
 
   return (

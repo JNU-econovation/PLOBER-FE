@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import { requireOptionalNativeModule } from "expo-modules-core";
+import type * as ExpoImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -39,9 +41,35 @@ import {
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 const DAYS_PER_WEEK = 7;
 
+declare const require: <T = unknown>(moduleName: string) => T;
+
+let imagePickerModule: typeof ExpoImagePicker | null | undefined;
+
+function getImagePickerModule() {
+  if (imagePickerModule !== undefined) return imagePickerModule;
+
+  try {
+    if (Platform.OS !== "web") {
+      const nativeImagePicker =
+        requireOptionalNativeModule("ExponentImagePicker");
+      if (!nativeImagePicker) {
+        imagePickerModule = null;
+        return imagePickerModule;
+      }
+    }
+
+    imagePickerModule =
+      require<typeof ExpoImagePicker>("expo-image-picker");
+  } catch {
+    imagePickerModule = null;
+  }
+
+  return imagePickerModule;
+}
+
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { session } = useAuthSession();
+  const { session, status } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -55,6 +83,11 @@ export function ProfileScreen() {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   useEffect(() => {
+    if (status === "loading") return;
+    if (status !== "authenticated") {
+      setProfile(null);
+      return;
+    }
     if (!session?.userId) return;
 
     let mounted = true;
@@ -80,12 +113,12 @@ export function ProfileScreen() {
     return () => {
       mounted = false;
     };
-  }, [session?.userId]);
+  }, [session?.userId, status]);
 
-  const displayedProfile = profile ?? {
-    nickname: session?.nickname ?? "플로버",
-    level: 1,
-    profileImageUrl: null,
+  const displayedProfile = {
+    nickname: profile?.nickname ?? session?.nickname ?? "플로버",
+    level: profile?.level ?? 1,
+    profileImageUrl: profile?.profileImageUrl ?? null,
   };
 
   const openNicknameEditor = () => {
@@ -101,6 +134,11 @@ export function ProfileScreen() {
   };
 
   const handleSaveNickname = async () => {
+    if (!session?.userId) {
+      setNicknameError("로그인이 필요합니다.");
+      return;
+    }
+
     const nextNickname = nicknameDraft.trim();
     if (!nextNickname) {
       setNicknameError("닉네임을 입력해주세요.");
@@ -113,6 +151,7 @@ export function ProfileScreen() {
     try {
       const updatedNickname = await updateMyNickname({
         nickname: nextNickname,
+        userId: session.userId,
       });
 
       setProfile((currentProfile) => ({
@@ -143,17 +182,31 @@ export function ProfileScreen() {
 
   const handleChangeProfileImage = async () => {
     if (uploadingProfileImage) return;
+    if (!session?.userId) {
+      setProfileImageError("로그인이 필요합니다.");
+      return;
+    }
 
     setUploadingProfileImage(true);
     setProfileImageError(null);
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        throw new Error("사진 접근 권한이 필요합니다.");
+      const imagePicker = getImagePickerModule();
+      if (!imagePicker) {
+        throw new Error(
+          "프로필 이미지 선택 모듈이 없습니다. 개발 빌드를 다시 빌드해주세요."
+        );
       }
 
-      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      if (Platform.OS !== "web") {
+        const permission =
+          await imagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          throw new Error("사진 접근 권한이 필요합니다.");
+        }
+      }
+
+      const pickerResult = await imagePicker.launchImageLibraryAsync({
         allowsEditing: true,
         aspect: [1, 1],
         mediaTypes: ["images"],
@@ -163,12 +216,36 @@ export function ProfileScreen() {
       if (pickerResult.canceled) return;
 
       const imageAsset = pickerResult.assets[0];
+      if (!imageAsset?.uri) {
+        throw new Error("선택한 이미지 정보를 가져오지 못했습니다.");
+      }
+
       const contentType = resolveProfileImageContentType({
         fileName: imageAsset.fileName,
         mimeType: imageAsset.mimeType,
         uri: imageAsset.uri,
       });
-      const uploadTarget = await getProfileImageUploadUrl({ contentType });
+
+      if (__DEV__) {
+        console.log("[profile-image] selected", {
+          contentType,
+          fileName: imageAsset.fileName,
+          mimeType: imageAsset.mimeType,
+          uri: imageAsset.uri,
+        });
+      }
+
+      const uploadTarget = await getProfileImageUploadUrl({
+        contentType,
+        userId: session.userId,
+      });
+
+      if (__DEV__) {
+        console.log("[profile-image] upload url issued", {
+          hasObjectUrl: Boolean(uploadTarget.objectUrl),
+          hasUploadUrl: Boolean(uploadTarget.uploadUrl),
+        });
+      }
 
       await uploadProfileImageToS3({
         contentType,
@@ -178,12 +255,15 @@ export function ProfileScreen() {
 
       const updatedProfileImage = await updateMyProfileImage({
         imageUrl: uploadTarget.objectUrl,
+        userId: session.userId,
       });
+      const nextProfileImageUrl =
+        updatedProfileImage.profileImageUrl ?? uploadTarget.objectUrl;
 
       setProfile((currentProfile) => ({
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: currentProfile?.nickname ?? displayedProfile.nickname,
-        profileImageUrl: updatedProfileImage.profileImageUrl,
+        profileImageUrl: nextProfileImageUrl,
       }));
     } catch (error) {
       setProfileImageError(
@@ -408,7 +488,7 @@ function ProfileAvatar({
       {imageUrl ? (
         <Image
           accessibilityIgnoresInvertColors
-          source={{ uri: imageUrl }}
+          source={{ cache: "reload", uri: imageUrl }}
           style={styles.avatarImage}
         />
       ) : (

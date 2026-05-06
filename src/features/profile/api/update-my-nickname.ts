@@ -8,11 +8,12 @@ import type {
 const MY_NICKNAME_PATH = "/api/users/me/nickname";
 
 export async function updateMyNickname(
-  body: UpdateMyNicknameRequest
+  { nickname, userId }: UpdateMyNicknameRequest
 ): Promise<UpdateMyNicknameResponse> {
   const response = await apiClient.put<UpdateMyNicknameResponse>(
     MY_NICKNAME_PATH,
-    body
+    { nickname },
+    { params: { userId } }
   );
   return response.data;
 }

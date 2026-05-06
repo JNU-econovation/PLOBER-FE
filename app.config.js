@@ -18,7 +18,23 @@ export default ({ config }) => ({
     // iOS 위치 권한 메시지 추가
     infoPlist: {
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
-      NSLocationAlwaysAndWhenInUseUsageDescription: "백그라운드에서도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다."
+      NSLocationAlwaysAndWhenInUseUsageDescription: "백그라운드에서도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
+      NSPhotoLibraryUsageDescription: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+        NSExceptionDomains: {
+          "13.125.28.197": {
+            NSExceptionAllowsInsecureHTTPLoads: true,
+            NSIncludesSubdomains: true,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
+          },
+          "ec2-13-125-28-197.ap-northeast-2.compute.amazonaws.com": {
+            NSExceptionAllowsInsecureHTTPLoads: true,
+            NSIncludesSubdomains: true,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
+          },
+        },
+      },
     },
   },
   
@@ -30,6 +46,7 @@ export default ({ config }) => ({
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     edgeToEdgeEnabled: true,
+    usesCleartextTraffic: true,
     predictiveBackGestureEnabled: false,
     package: "com.lewis.myproject",
     // Android 위치 권한 추가
