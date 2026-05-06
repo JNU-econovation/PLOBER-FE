@@ -19,21 +19,26 @@ export default function RootLayout() {
 
 function RootStack() {
   return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="login" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="ai-route" />
-        <Stack.Screen name="plogging" />
-        <Stack.Screen name="report" />
-        <Stack.Screen name="Map" />
-      </Stack>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="login" />
+      <Stack.Screen name="kakao-login" />
+      <Stack.Screen name="kakao-redirect" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="ai-route" />
+      <Stack.Screen name="plogging" />
+      <Stack.Screen name="report" />
+      <Stack.Screen name="Map" />
+    </Stack>
   );
 }
 
 function AuthGate({ children }: { children: ReactNode }) {
   const segments = useSegments();
   const { status } = useAuthSession();
-  const onLoginRoute = segments[0] === "login";
+  const onAuthRoute =
+    segments[0] === "login" ||
+    segments[0] === "kakao-login" ||
+    segments[0] === "kakao-redirect";
 
   if (status === "loading") {
     return (
@@ -43,11 +48,11 @@ function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "unauthenticated" && !onLoginRoute) {
+  if (status === "unauthenticated" && !onAuthRoute) {
     return <Redirect href="/login" />;
   }
 
-  if (status === "authenticated" && onLoginRoute) {
+  if (status === "authenticated" && onAuthRoute) {
     return <Redirect href="/" />;
   }
 

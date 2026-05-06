@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useRouter } from "expo-router";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -11,31 +10,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
 
-import { useAuthSession } from "../hooks/use-auth-session";
-
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { signInWithKakao } = useAuthSession();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
-  const handleLogin = async () => {
-    if (submitting) return;
-
-    setSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      await signInWithKakao();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "카카오 로그인 중 문제가 발생했습니다."
-      );
-    } finally {
-      setSubmitting(false);
-    }
+  const handleLogin = () => {
+    router.push("/kakao-login");
   };
 
   return (
@@ -62,29 +42,18 @@ export function LoginScreen() {
         </View>
 
         <View style={styles.actionBlock}>
-          {errorMessage ? (
-            <Text selectable style={styles.errorText}>
-              {errorMessage}
-            </Text>
-          ) : null}
           <Pressable
             accessibilityLabel="카카오로 로그인"
             accessibilityRole="button"
-            disabled={submitting}
             onPress={handleLogin}
             style={({ pressed }) => [
               styles.kakaoButton,
-              pressed && !submitting ? styles.pressed : null,
-              submitting ? styles.disabled : null,
+              pressed ? styles.pressed : null,
             ]}
           >
-            {submitting ? (
-              <ActivityIndicator color="#111111" />
-            ) : (
-              <Text selectable style={styles.kakaoButtonText}>
-                카카오로 로그인
-              </Text>
-            )}
+            <Text selectable style={styles.kakaoButtonText}>
+              카카오로 로그인
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -105,15 +74,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-  },
-  disabled: {
-    opacity: 0.64,
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
   },
   kakaoButton: {
     alignItems: "center",
