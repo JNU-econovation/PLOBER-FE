@@ -22,9 +22,15 @@ export default ({ config }) => ({
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
         NSExceptionDomains: {
+          "13.125.28.197": {
+            NSExceptionAllowsInsecureHTTPLoads: true,
+            NSIncludesSubdomains: true,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
+          },
           "ec2-13-125-28-197.ap-northeast-2.compute.amazonaws.com": {
             NSExceptionAllowsInsecureHTTPLoads: true,
             NSIncludesSubdomains: true,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
           },
         },
       },
