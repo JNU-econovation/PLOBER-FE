@@ -1,4 +1,5 @@
 import type { AxiosError, AxiosInstance } from "axios";
+import { Platform } from "react-native";
 
 import { getSession } from "@/src/shared/auth";
 
@@ -25,7 +26,9 @@ export function attachInterceptors(client: AxiosInstance): void {
       const body = error.response?.data;
       const message =
         error.message === "Network Error"
-          ? "서버에 연결할 수 없습니다. 웹 실행 포트와 백엔드 CORS 설정을 확인해주세요."
+          ? Platform.OS === "web"
+            ? "서버에 연결할 수 없습니다. 웹 실행 포트와 백엔드 CORS 설정을 확인해주세요."
+            : "서버에 연결할 수 없습니다. 백엔드 주소와 HTTP 통신 허용 설정을 확인해주세요."
           : body?.message ?? error.message;
 
       throw new ApiError(message, {
