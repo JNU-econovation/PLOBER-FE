@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +24,11 @@ export function KakaoLoginRedirectScreen() {
   );
 
   useEffect(() => {
+    if (Platform.OS !== "web") {
+      router.replace("/login");
+      return;
+    }
+
     if (completedRef.current || errorMessage) return;
     completedRef.current = true;
 

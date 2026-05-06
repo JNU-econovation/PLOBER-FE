@@ -15,6 +15,7 @@ import type { WebViewProps } from "react-native-webview";
 import { ScreenRoot } from "@/src/shared/ui";
 import { colors } from "@/src/shared/theme";
 
+import { useAuthSession } from "../hooks/use-auth-session";
 import {
   buildKakaoAuthorizeUrl,
   getKakaoRedirectResult,
@@ -40,7 +41,12 @@ function getWebViewComponent() {
 export function KakaoLoginWebviewScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { completeKakaoLoginWithCode } = useAuthSession();
   const [loading, setLoading] = useState(true);
+  const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(
+    null
+  );
+  const [submittingCode, setSubmittingCode] = useState(false);
   const WebView = useMemo(() => getWebViewComponent(), []);
   const authorizeUrl = useMemo(() => {
     try {
@@ -56,27 +62,31 @@ export function KakaoLoginWebviewScreen() {
     try {
       const code = getKakaoRedirectResult(url);
       if (!code) {
-        router.replace({
-          pathname: "/kakao-redirect",
-          params: { error: "카카오 인가 코드를 찾을 수 없습니다." },
-        });
+        setLoginErrorMessage("카카오 인가 코드를 찾을 수 없습니다.");
         return true;
       }
 
-      router.replace({
-        pathname: "/kakao-redirect",
-        params: { code },
-      });
-    } catch (error) {
-      router.replace({
-        pathname: "/kakao-redirect",
-        params: {
-          error:
+      setSubmittingCode(true);
+      completeKakaoLoginWithCode(code)
+        .then(() => {
+          router.replace("/");
+        })
+        .catch((error) => {
+          setLoginErrorMessage(
             error instanceof Error
               ? error.message
-              : "카카오 로그인 중 문제가 발생했습니다.",
-        },
-      });
+              : "카카오 로그인 중 문제가 발생했습니다."
+          );
+        })
+        .finally(() => {
+          setSubmittingCode(false);
+        });
+    } catch (error) {
+      setLoginErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "카카오 로그인 중 문제가 발생했습니다."
+      );
     }
 
     return true;
@@ -160,6 +170,43 @@ export function KakaoLoginWebviewScreen() {
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : null}
+      {submittingCode || loginErrorMessage ? (
+        <View style={styles.resultOverlay}>
+          {loginErrorMessage ? (
+            <>
+              <Text selectable style={styles.errorTitle}>
+                로그인에 실패했습니다.
+              </Text>
+              <Text selectable style={styles.errorDescription}>
+                {loginErrorMessage}
+              </Text>
+              <Pressable
+                accessibilityLabel="카카오 로그인 다시 시도"
+                accessibilityRole="button"
+                onPress={() => {
+                  setLoginErrorMessage(null);
+                  setLoading(true);
+                }}
+                style={({ pressed }) => [
+                  styles.backButton,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <Text selectable style={styles.backButtonText}>
+                  다시 시도
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator color={colors.primary} />
+              <Text selectable style={styles.errorDescription}>
+                카카오 로그인 처리 중입니다.
+              </Text>
+            </>
+          )}
+        </View>
+      ) : null}
       <WebView
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
@@ -173,6 +220,7 @@ export function KakaoLoginWebviewScreen() {
         }}
         originWhitelist={["*"]}
         source={{ uri: authorizeUrl }}
+        key={loginErrorMessage ? "kakao-login-error" : "kakao-login"}
         startInLoadingState
         style={styles.webview}
       />
@@ -247,6 +295,18 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     zIndex: 1,
+  },
+  resultOverlay: {
+    alignItems: "center",
+    backgroundColor: colors.background,
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    paddingHorizontal: 28,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 2,
   },
   pressed: {
     opacity: 0.72,
