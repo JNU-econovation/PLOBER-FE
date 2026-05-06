@@ -161,7 +161,8 @@ export function KakaoLoginWebviewScreen() {
         </View>
       ) : null}
       <WebView
-        incognito
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
         javaScriptEnabled
         onLoadEnd={() => setLoading(false)}
         onNavigationStateChange={(event) => {
