@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { requireOptionalNativeModule } from "expo-modules-core";
 
 const AUTH_SESSION_KEY = "plober_auth_session";
+const SECURE_STORE_OPTIONS = {};
 
 export type AuthSession = {
   accessToken: string;
@@ -90,13 +91,19 @@ export async function getSession(): Promise<AuthSession | null> {
     return readFallbackSession();
   }
 
-  const rawSession = await secureStore?.getValueWithKeyAsync(AUTH_SESSION_KEY);
+  const rawSession = await secureStore?.getValueWithKeyAsync(
+    AUTH_SESSION_KEY,
+    SECURE_STORE_OPTIONS
+  );
   if (!rawSession) return null;
 
   try {
     return JSON.parse(rawSession) as AuthSession;
   } catch {
-    await secureStore?.deleteValueWithKeyAsync(AUTH_SESSION_KEY);
+    await secureStore?.deleteValueWithKeyAsync(
+      AUTH_SESSION_KEY,
+      SECURE_STORE_OPTIONS
+    );
     return null;
   }
 }
@@ -110,7 +117,11 @@ export async function saveSession(session: AuthSession): Promise<void> {
     return;
   }
 
-  await secureStore?.setValueWithKeyAsync(serializedSession, AUTH_SESSION_KEY);
+  await secureStore?.setValueWithKeyAsync(
+    serializedSession,
+    AUTH_SESSION_KEY,
+    SECURE_STORE_OPTIONS
+  );
 }
 
 export async function clearSession(): Promise<void> {
@@ -120,5 +131,8 @@ export async function clearSession(): Promise<void> {
     return;
   }
 
-  await secureStore?.deleteValueWithKeyAsync(AUTH_SESSION_KEY);
+  await secureStore?.deleteValueWithKeyAsync(
+    AUTH_SESSION_KEY,
+    SECURE_STORE_OPTIONS
+  );
 }
