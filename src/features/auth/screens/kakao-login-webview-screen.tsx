@@ -128,26 +128,35 @@ export function KakaoLoginWebviewScreen() {
 
   return (
     <ScreenRoot>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <Pressable
-          accessibilityLabel="로그인 취소"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => router.replace("/login")}
-          style={({ pressed }) => [
-            styles.iconButton,
-            pressed ? styles.pressed : null,
-          ]}
-        >
-          <Feather color={colors.icon} name="x" size={22} />
-        </Pressable>
-        <Text selectable style={styles.headerTitle}>
-          카카오 로그인
-        </Text>
-        <View style={styles.iconButton} />
+      <View style={styles.header}>
+        <View style={{ height: insets.top }} />
+        <View style={styles.headerContent}>
+          <Pressable
+            accessibilityLabel="로그인 취소"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => router.replace("/login")}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <Feather color={colors.icon} name="x" size={22} />
+          </Pressable>
+          <Text selectable style={styles.headerTitle}>
+            카카오 로그인
+          </Text>
+          <View style={styles.iconButton} />
+        </View>
       </View>
       {loading ? (
-        <View pointerEvents="none" style={styles.loadingOverlay}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.loadingOverlay,
+            { top: insets.top + HEADER_CONTENT_HEIGHT },
+          ]}
+        >
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : null}
@@ -169,6 +178,8 @@ export function KakaoLoginWebviewScreen() {
     </ScreenRoot>
   );
 }
+
+const HEADER_CONTENT_HEIGHT = 56;
 
 const styles = StyleSheet.create({
   backButton: {
@@ -204,12 +215,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   header: {
-    alignItems: "center",
     backgroundColor: colors.surface,
     borderBottomColor: colors.line,
     borderBottomWidth: 1,
+  },
+  headerContent: {
+    alignItems: "center",
     flexDirection: "row",
-    height: 64,
+    height: HEADER_CONTENT_HEIGHT,
     justifyContent: "space-between",
     paddingHorizontal: 16,
   },
@@ -232,7 +245,6 @@ const styles = StyleSheet.create({
     left: 0,
     position: "absolute",
     right: 0,
-    top: 64,
     zIndex: 1,
   },
   pressed: {
