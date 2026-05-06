@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import { requireOptionalNativeModule } from "expo-modules-core";
+import type * as ExpoImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
   Image,
@@ -38,6 +39,29 @@ import {
 
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 const DAYS_PER_WEEK = 7;
+
+declare const require: <T = unknown>(moduleName: string) => T;
+
+let imagePickerModule: typeof ExpoImagePicker | null | undefined;
+
+function getImagePickerModule() {
+  if (imagePickerModule !== undefined) return imagePickerModule;
+
+  const nativeImagePicker = requireOptionalNativeModule("ExponentImagePicker");
+  if (!nativeImagePicker) {
+    imagePickerModule = null;
+    return imagePickerModule;
+  }
+
+  try {
+    imagePickerModule =
+      require<typeof ExpoImagePicker>("expo-image-picker");
+  } catch {
+    imagePickerModule = null;
+  }
+
+  return imagePickerModule;
+}
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -148,12 +172,19 @@ export function ProfileScreen() {
     setProfileImageError(null);
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const imagePicker = getImagePickerModule();
+      if (!imagePicker) {
+        throw new Error(
+          "프로필 이미지 선택 모듈이 없습니다. 개발 빌드를 다시 빌드해주세요."
+        );
+      }
+
+      const permission = await imagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         throw new Error("사진 접근 권한이 필요합니다.");
       }
 
-      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      const pickerResult = await imagePicker.launchImageLibraryAsync({
         allowsEditing: true,
         aspect: [1, 1],
         mediaTypes: ["images"],
