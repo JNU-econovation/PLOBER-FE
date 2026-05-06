@@ -43,3 +43,32 @@ export type MonthlyPloggingSummary = {
   totalPloggingCount: number;
   totalPloggingSeconds: number;
 };
+
+export type DayOfWeek =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
+
+export type GetWeeklyPloggingSummaryRequest = {
+  startDate: string;
+};
+
+export type DailyPloggingStat = {
+  date: string;
+  dayOfWeek: DayOfWeek;
+  stepCount: number;
+  distanceMeters: number;
+  caloriesBurned: number;
+  ploggingCount: number;
+  ploggingSeconds: number;
+};
+
+export type WeeklyPloggingSummary = {
+  startDate: string;
+  endDate: string;
+  dailyStats: DailyPloggingStat[];
+};
