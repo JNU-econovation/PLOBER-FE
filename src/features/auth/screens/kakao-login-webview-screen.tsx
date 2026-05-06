@@ -59,9 +59,18 @@ export function KakaoLoginWebviewScreen() {
   const handleRedirectUrl = (url: string) => {
     if (!isKakaoRedirectUrl(url)) return false;
 
+    if (__DEV__) {
+      console.log("[kakao-webview] handling redirect", {
+        urlWithoutQuery: url.split("?")[0],
+      });
+    }
+
     try {
       const code = getKakaoRedirectResult(url);
       if (!code) {
+        if (__DEV__) {
+          console.log("[kakao-webview] redirect has no code");
+        }
         setLoginErrorMessage("카카오 인가 코드를 찾을 수 없습니다.");
         return true;
       }
@@ -69,9 +78,20 @@ export function KakaoLoginWebviewScreen() {
       setSubmittingCode(true);
       completeKakaoLoginWithCode(code)
         .then(() => {
+          if (__DEV__) {
+            console.log("[kakao-webview] login completed");
+          }
           router.replace("/");
         })
         .catch((error) => {
+          if (__DEV__) {
+            console.log("[kakao-webview] login failed", {
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "unknown kakao login error",
+            });
+          }
           setLoginErrorMessage(
             error instanceof Error
               ? error.message
@@ -82,6 +102,14 @@ export function KakaoLoginWebviewScreen() {
           setSubmittingCode(false);
         });
     } catch (error) {
+      if (__DEV__) {
+        console.log("[kakao-webview] redirect handling failed", {
+          message:
+            error instanceof Error
+              ? error.message
+              : "unknown kakao redirect error",
+        });
+      }
       setLoginErrorMessage(
         error instanceof Error
           ? error.message

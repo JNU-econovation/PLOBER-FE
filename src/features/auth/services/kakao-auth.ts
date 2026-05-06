@@ -16,7 +16,16 @@ export function buildKakaoAuthorizeUrl() {
     response_type: "code",
   });
 
-  return `${KAKAO_AUTHORIZE_URL}?${params.toString()}`;
+  const authorizeUrl = `${KAKAO_AUTHORIZE_URL}?${params.toString()}`;
+
+  if (__DEV__) {
+    console.log("[kakao] build authorize url", {
+      redirectUri: KAKAO_REDIRECT_URI,
+      restApiKeyLength: KAKAO_REST_API_KEY.length,
+    });
+  }
+
+  return authorizeUrl;
 }
 
 function normalizeUrlForCompare(url: string) {
@@ -29,9 +38,18 @@ function normalizeUrlForCompare(url: string) {
 }
 
 export function isKakaoRedirectUrl(url: string) {
-  return (
-    normalizeUrlForCompare(url) === normalizeUrlForCompare(KAKAO_REDIRECT_URI)
-  );
+  const currentUrl = normalizeUrlForCompare(url);
+  const expectedUrl = normalizeUrlForCompare(KAKAO_REDIRECT_URI);
+  const matches = currentUrl === expectedUrl;
+
+  if (__DEV__ && matches) {
+    console.log("[kakao] redirect matched", {
+      expectedUrl,
+      receivedUrl: currentUrl,
+    });
+  }
+
+  return matches;
 }
 
 export function getKakaoRedirectResult(url: string) {
@@ -42,7 +60,20 @@ export function getKakaoRedirectResult(url: string) {
   const errorDescription = params.get("error_description");
 
   if (error) {
+    if (__DEV__) {
+      console.log("[kakao] redirect error", {
+        error,
+        errorDescription,
+      });
+    }
     throw new Error(errorDescription ?? error);
+  }
+
+  if (__DEV__) {
+    console.log("[kakao] redirect code parsed", {
+      hasCode: Boolean(code),
+      codeLength: code?.length ?? 0,
+    });
   }
 
   return code;
@@ -53,8 +84,21 @@ export async function completeKakaoLogin(code: string) {
     throw new Error("카카오 인가 코드를 찾을 수 없습니다.");
   }
 
+  if (__DEV__) {
+    console.log("[kakao] login api start", {
+      codeLength: code.length,
+    });
+  }
+
   const session = await loginWithKakaoCode(code);
   await saveSession(session);
+
+  if (__DEV__) {
+    console.log("[kakao] login api success", {
+      hasAccessToken: Boolean(session.accessToken),
+      userId: session.userId,
+    });
+  }
 
   return session;
 }
