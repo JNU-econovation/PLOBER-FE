@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
   Image,
@@ -17,13 +18,23 @@ import { saveSession, useAuthSession } from "@/src/features/auth";
 import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows, typography } from "@/src/shared/theme";
 
-import { getUserProfile, updateMyNickname, type UserProfile } from "../api";
+import {
+  getProfileImageUploadUrl,
+  getUserProfile,
+  updateMyNickname,
+  updateMyProfileImage,
+  type UserProfile,
+} from "../api";
 import {
   type CalendarMonth,
   DEFAULT_PROFILE_CALENDAR,
   monthlyActivityDays,
   profileSummaryStats,
 } from "../data/profile-data";
+import {
+  resolveProfileImageContentType,
+  uploadProfileImageToS3,
+} from "../services";
 
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 const DAYS_PER_WEEK = 7;
@@ -38,6 +49,10 @@ export function ProfileScreen() {
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
   const [savingNickname, setSavingNickname] = useState(false);
+  const [profileImageError, setProfileImageError] = useState<string | null>(
+    null
+  );
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   useEffect(() => {
     if (!session?.userId) return;
@@ -126,6 +141,61 @@ export function ProfileScreen() {
     }
   };
 
+  const handleChangeProfileImage = async () => {
+    if (uploadingProfileImage) return;
+
+    setUploadingProfileImage(true);
+    setProfileImageError(null);
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error("사진 접근 권한이 필요합니다.");
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        mediaTypes: ["images"],
+        quality: 0.9,
+      });
+
+      if (pickerResult.canceled) return;
+
+      const imageAsset = pickerResult.assets[0];
+      const contentType = resolveProfileImageContentType({
+        fileName: imageAsset.fileName,
+        mimeType: imageAsset.mimeType,
+        uri: imageAsset.uri,
+      });
+      const uploadTarget = await getProfileImageUploadUrl({ contentType });
+
+      await uploadProfileImageToS3({
+        contentType,
+        uploadUrl: uploadTarget.uploadUrl,
+        uri: imageAsset.uri,
+      });
+
+      const updatedProfileImage = await updateMyProfileImage({
+        imageUrl: uploadTarget.objectUrl,
+      });
+
+      setProfile((currentProfile) => ({
+        level: currentProfile?.level ?? displayedProfile.level,
+        nickname: currentProfile?.nickname ?? displayedProfile.nickname,
+        profileImageUrl: updatedProfileImage.profileImageUrl,
+      }));
+    } catch (error) {
+      setProfileImageError(
+        error instanceof Error
+          ? error.message
+          : "프로필 이미지를 저장하지 못했습니다."
+      );
+    } finally {
+      setUploadingProfileImage(false);
+    }
+  };
+
   return (
     <ScreenRoot>
       <ScrollView
@@ -144,7 +214,17 @@ export function ProfileScreen() {
             {profileError}
           </Text>
         ) : null}
-        <ProfileOverview loading={loadingProfile} profile={displayedProfile} />
+        {profileImageError ? (
+          <Text selectable style={styles.errorText}>
+            {profileImageError}
+          </Text>
+        ) : null}
+        <ProfileOverview
+          loading={loadingProfile}
+          onChangeProfileImage={handleChangeProfileImage}
+          profile={displayedProfile}
+          uploadingProfileImage={uploadingProfileImage}
+        />
         <SummaryStatsCard />
         <ActivityCalendar />
       </ScrollView>
@@ -266,14 +346,22 @@ function NicknameEditModal({
 
 function ProfileOverview({
   loading,
+  onChangeProfileImage,
   profile,
+  uploadingProfileImage,
 }: {
   loading: boolean;
+  onChangeProfileImage: () => void;
   profile: UserProfile;
+  uploadingProfileImage: boolean;
 }) {
   return (
     <View style={styles.profileOverview}>
-      <ProfileAvatar imageUrl={profile.profileImageUrl} />
+      <ProfileAvatar
+        imageUrl={profile.profileImageUrl}
+        onPress={onChangeProfileImage}
+        uploading={uploadingProfileImage}
+      />
       <View style={styles.profileTextBlock}>
         <Text selectable style={styles.userName}>
           {profile.nickname}
@@ -297,9 +385,26 @@ function ProfileOverview({
   );
 }
 
-function ProfileAvatar({ imageUrl }: { imageUrl: string | null }) {
+function ProfileAvatar({
+  imageUrl,
+  onPress,
+  uploading,
+}: {
+  imageUrl: string | null;
+  onPress: () => void;
+  uploading: boolean;
+}) {
   return (
-    <View style={styles.avatar}>
+    <Pressable
+      accessibilityLabel="프로필 이미지 수정"
+      accessibilityRole="button"
+      disabled={uploading}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.avatar,
+        pressed && !uploading ? styles.pressed : null,
+      ]}
+    >
       {imageUrl ? (
         <Image
           accessibilityIgnoresInvertColors
@@ -314,7 +419,14 @@ function ProfileAvatar({ imageUrl }: { imageUrl: string | null }) {
           <Text style={styles.avatarFace}>{">  ·"}</Text>
         </>
       )}
-    </View>
+      <View style={styles.avatarCameraBadge}>
+        {uploading ? (
+          <ActivityIndicator color={colors.surface} size="small" />
+        ) : (
+          <Feather color={colors.surface} name="camera" size={15} />
+        )}
+      </View>
+    </Pressable>
   );
 }
 
@@ -525,6 +637,17 @@ const styles = StyleSheet.create({
   avatarImage: {
     height: "100%",
     width: "100%",
+  },
+  avatarCameraBadge: {
+    alignItems: "center",
+    backgroundColor: colors.icon,
+    borderRadius: 15,
+    bottom: 5,
+    height: 30,
+    justifyContent: "center",
+    position: "absolute",
+    right: 5,
+    width: 30,
   },
   calendarCard: {
     alignSelf: "center",
