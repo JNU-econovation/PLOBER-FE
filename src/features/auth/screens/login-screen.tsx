@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,11 +11,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
 
+import { buildKakaoAuthorizeUrl } from "../services/kakao-auth";
+
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const handleLogin = () => {
+    if (Platform.OS === "web") {
+      window.location.href = buildKakaoAuthorizeUrl();
+      return;
+    }
+
     router.push("/kakao-login");
   };
 

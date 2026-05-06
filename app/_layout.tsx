@@ -23,6 +23,7 @@ function RootStack() {
       <Stack.Screen name="login" />
       <Stack.Screen name="kakao-login" />
       <Stack.Screen name="kakao-redirect" />
+      <Stack.Screen name="kakao/callback" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="ai-route" />
       <Stack.Screen name="plogging" />
@@ -38,7 +39,8 @@ function AuthGate({ children }: { children: ReactNode }) {
   const onAuthRoute =
     segments[0] === "login" ||
     segments[0] === "kakao-login" ||
-    segments[0] === "kakao-redirect";
+    segments[0] === "kakao-redirect" ||
+    segments[0] === "kakao";
 
   if (status === "loading") {
     return (
