@@ -23,8 +23,12 @@ export function attachInterceptors(client: AxiosInstance): void {
     (error: AxiosError<ServerErrorBody>) => {
       const status = error.response?.status;
       const body = error.response?.data;
+      const message =
+        error.message === "Network Error"
+          ? "서버에 연결할 수 없습니다. 웹 실행 포트와 백엔드 CORS 설정을 확인해주세요."
+          : body?.message ?? error.message;
 
-      throw new ApiError(body?.message ?? error.message, {
+      throw new ApiError(message, {
         status,
         code: body?.code,
         details: error.response?.data,
