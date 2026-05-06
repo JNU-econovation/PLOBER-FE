@@ -238,23 +238,24 @@ export function KakaoLoginWebviewScreen() {
           )}
         </View>
       ) : null}
-      <WebView
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-        javaScriptEnabled
-        onLoadEnd={() => setLoading(false)}
-        onNavigationStateChange={(event) => {
-          handleRedirectUrl(event.url);
-        }}
-        onShouldStartLoadWithRequest={(request) => {
-          return !handleRedirectUrl(request.url);
-        }}
-        originWhitelist={["*"]}
-        source={{ uri: authorizeUrl }}
-        key={loginErrorMessage ? "kakao-login-error" : "kakao-login"}
-        startInLoadingState
-        style={styles.webview}
-      />
+      {!submittingCode && !loginErrorMessage ? (
+        <WebView
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          javaScriptEnabled
+          onLoadEnd={() => setLoading(false)}
+          onNavigationStateChange={(event) => {
+            handleRedirectUrl(event.url);
+          }}
+          onShouldStartLoadWithRequest={(request) => {
+            return !handleRedirectUrl(request.url);
+          }}
+          originWhitelist={["*"]}
+          source={{ uri: authorizeUrl }}
+          startInLoadingState
+          style={styles.webview}
+        />
+      ) : null}
     </ScreenRoot>
   );
 }
