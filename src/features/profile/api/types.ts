@@ -3,3 +3,12 @@ export type UserProfile = {
   level: number;
   profileImageUrl: string | null;
 };
+
+export type UpdateMyNicknameRequest = {
+  nickname: string;
+};
+
+export type UpdateMyNicknameResponse = {
+  userId: number;
+  nickname: string;
+};
