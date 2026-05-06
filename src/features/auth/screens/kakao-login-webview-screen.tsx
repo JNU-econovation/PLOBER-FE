@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
@@ -47,6 +47,7 @@ export function KakaoLoginWebviewScreen() {
     null
   );
   const [submittingCode, setSubmittingCode] = useState(false);
+  const handledRedirectUrlRef = useRef<string | null>(null);
   const WebView = useMemo(() => getWebViewComponent(), []);
   const authorizeUrl = useMemo(() => {
     try {
@@ -58,6 +59,8 @@ export function KakaoLoginWebviewScreen() {
 
   const handleRedirectUrl = (url: string) => {
     if (!isKakaoRedirectUrl(url)) return false;
+    if (handledRedirectUrlRef.current === url) return true;
+    handledRedirectUrlRef.current = url;
 
     if (__DEV__) {
       console.log("[kakao-webview] handling redirect", {
