@@ -50,6 +50,12 @@ export default ({ config }) => ({
     "expo-web-browser",
     "expo-secure-store",
     [
+      "expo-image-picker",
+      {
+        photosPermission: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
+      },
+    ],
+    [
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",
