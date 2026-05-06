@@ -1,11 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuthSession } from "@/src/features/auth";
 import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows, typography } from "@/src/shared/theme";
 
+import { getUserProfile, type UserProfile } from "../api";
 import {
   type CalendarMonth,
   DEFAULT_PROFILE_CALENDAR,
@@ -18,6 +28,44 @@ const DAYS_PER_WEEK = 7;
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { session } = useAuthSession();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session?.userId) return;
+
+    let mounted = true;
+    setLoadingProfile(true);
+    setProfileError(null);
+
+    getUserProfile(session.userId)
+      .then((nextProfile) => {
+        if (mounted) setProfile(nextProfile);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        setProfileError(
+          error instanceof Error
+            ? error.message
+            : "프로필 정보를 불러오지 못했습니다."
+        );
+      })
+      .finally(() => {
+        if (mounted) setLoadingProfile(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.userId]);
+
+  const displayedProfile = profile ?? {
+    nickname: session?.nickname ?? "플로버",
+    level: 1,
+    profileImageUrl: null,
+  };
 
   return (
     <ScreenRoot>
@@ -32,7 +80,12 @@ export function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <SettingsButton />
-        <ProfileOverview />
+        {profileError ? (
+          <Text selectable style={styles.errorText}>
+            {profileError}
+          </Text>
+        ) : null}
+        <ProfileOverview loading={loadingProfile} profile={displayedProfile} />
         <SummaryStatsCard />
         <ActivityCalendar />
       </ScrollView>
@@ -56,23 +109,30 @@ function SettingsButton() {
   );
 }
 
-function ProfileOverview() {
+function ProfileOverview({
+  loading,
+  profile,
+}: {
+  loading: boolean;
+  profile: UserProfile;
+}) {
   return (
     <View style={styles.profileOverview}>
-      <ProfileAvatar />
+      <ProfileAvatar imageUrl={profile.profileImageUrl} />
       <View style={styles.profileTextBlock}>
         <Text selectable style={styles.userName}>
-          정아현
+          {profile.nickname}
         </Text>
         <View style={styles.levelRow}>
           <View style={styles.levelBadge}>
             <Text selectable style={styles.levelBadgeText}>
-              Lv.7
+              Lv.{profile.level}
             </Text>
           </View>
           <Text selectable style={styles.levelTitle}>
             길거리 수호자
           </Text>
+          {loading ? <ActivityIndicator color={colors.primary} size="small" /> : null}
         </View>
         <View style={styles.progressTrack}>
           <View style={styles.progressFill} />
@@ -82,13 +142,23 @@ function ProfileOverview() {
   );
 }
 
-function ProfileAvatar() {
+function ProfileAvatar({ imageUrl }: { imageUrl: string | null }) {
   return (
     <View style={styles.avatar}>
-      <View style={[styles.avatarLeaf, styles.avatarLeafLeft]} />
-      <View style={[styles.avatarLeaf, styles.avatarLeafCenter]} />
-      <View style={[styles.avatarLeaf, styles.avatarLeafRight]} />
-      <Text style={styles.avatarFace}>{">  ·"}</Text>
+      {imageUrl ? (
+        <Image
+          accessibilityIgnoresInvertColors
+          source={{ uri: imageUrl }}
+          style={styles.avatarImage}
+        />
+      ) : (
+        <>
+          <View style={[styles.avatarLeaf, styles.avatarLeafLeft]} />
+          <View style={[styles.avatarLeaf, styles.avatarLeafCenter]} />
+          <View style={[styles.avatarLeaf, styles.avatarLeafRight]} />
+          <Text style={styles.avatarFace}>{">  ·"}</Text>
+        </>
+      )}
     </View>
   );
 }
@@ -297,6 +367,10 @@ const styles = StyleSheet.create({
     right: -8,
     transform: [{ rotate: "24deg" }],
   },
+  avatarImage: {
+    height: "100%",
+    width: "100%",
+  },
   calendarCard: {
     alignSelf: "center",
     backgroundColor: colors.surface,
@@ -347,6 +421,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     letterSpacing: 0,
     lineHeight: 14,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "right",
   },
   levelBadge: {
     alignItems: "center",
