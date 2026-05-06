@@ -6,6 +6,7 @@ export type UserProfile = {
 
 export type UpdateMyNicknameRequest = {
   nickname: string;
+  userId: number;
 };
 
 export type UpdateMyNicknameResponse = {
@@ -23,6 +24,7 @@ export type ProfileImageUploadContentType =
 
 export type GetProfileImageUploadUrlRequest = {
   contentType: ProfileImageUploadContentType;
+  userId: number;
 };
 
 export type GetProfileImageUploadUrlResponse = {
@@ -32,6 +34,7 @@ export type GetProfileImageUploadUrlResponse = {
 
 export type UpdateMyProfileImageRequest = {
   imageUrl: string;
+  userId: number;
 };
 
 export type UpdateMyProfileImageResponse = {

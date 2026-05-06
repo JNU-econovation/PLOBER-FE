@@ -19,6 +19,8 @@ const ACCEPTED_CONTENT_TYPES = new Set<ProfileImageUploadContentType>([
   "image/avif",
 ]);
 
+const PROFILE_IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
+
 export function resolveProfileImageContentType({
   fileName,
   mimeType,
@@ -41,11 +43,7 @@ export function resolveProfileImageContentType({
     ? MIME_TYPE_BY_EXTENSION[extension]
     : undefined;
 
-  if (!resolvedContentType) {
-    throw new Error("지원하지 않는 이미지 형식입니다.");
-  }
-
-  return resolvedContentType;
+  return resolvedContentType ?? "image/jpeg";
 }
 
 export async function uploadProfileImageToS3({
@@ -57,18 +55,73 @@ export async function uploadProfileImageToS3({
   uploadUrl: string;
   uri: string;
 }): Promise<void> {
-  const imageResponse = await fetch(uri);
-  const imageBlob = await imageResponse.blob();
+  if (!uploadUrl) {
+    throw new Error("프로필 이미지 업로드 URL을 받지 못했습니다.");
+  }
 
-  const uploadResponse = await fetch(uploadUrl, {
-    body: imageBlob,
-    headers: {
-      "Content-Type": contentType,
-    },
-    method: "PUT",
-  });
+  const imageResponse = await fetch(uri);
+  if (!imageResponse.ok) {
+    throw new Error("선택한 이미지를 읽지 못했습니다.");
+  }
+
+  const imageBlob = await imageResponse.blob();
+  if (imageBlob.size === 0) {
+    throw new Error("선택한 이미지 파일이 비어 있습니다.");
+  }
+
+  if (__DEV__) {
+    console.log("[profile-image] upload start", {
+      blobSize: imageBlob.size,
+      contentType,
+      blobType: imageBlob.type,
+      uploadHost: new URL(uploadUrl).host,
+    });
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    abortController.abort();
+  }, PROFILE_IMAGE_UPLOAD_TIMEOUT_MS);
+
+  let uploadResponse: Response;
+  try {
+    uploadResponse = await fetch(uploadUrl, {
+      body: imageBlob,
+      headers: {
+        "Content-Type": contentType,
+      },
+      method: "PUT",
+      signal: abortController.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        "프로필 이미지 업로드 시간이 초과되었습니다. S3 업로드 URL 또는 CORS 설정을 확인해주세요."
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!uploadResponse.ok) {
-    throw new Error("프로필 이미지 업로드에 실패했습니다.");
+    const errorBody = await uploadResponse.text().catch(() => "");
+    if (__DEV__) {
+      console.log("[profile-image] upload failed", {
+        body: errorBody,
+        status: uploadResponse.status,
+      });
+    }
+
+    throw new Error(
+      `프로필 이미지 업로드에 실패했습니다. (${uploadResponse.status})`
+    );
+  }
+
+  if (__DEV__) {
+    console.log("[profile-image] upload success", {
+      status: uploadResponse.status,
+    });
   }
 }

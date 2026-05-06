@@ -9,11 +9,11 @@ const PROFILE_IMAGE_UPLOAD_URL_PATH =
   "/api/users/me/profile-image/upload-url";
 
 export async function getProfileImageUploadUrl(
-  params: GetProfileImageUploadUrlRequest
+  { contentType, userId }: GetProfileImageUploadUrlRequest
 ): Promise<GetProfileImageUploadUrlResponse> {
   const response = await apiClient.get<GetProfileImageUploadUrlResponse>(
     PROFILE_IMAGE_UPLOAD_URL_PATH,
-    { params }
+    { params: { contentType, userId } }
   );
   return response.data;
 }
