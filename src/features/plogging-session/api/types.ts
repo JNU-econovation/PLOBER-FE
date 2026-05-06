@@ -44,3 +44,20 @@ export type GetMapImageUploadUrlResponse = {
   uploadUrl: string;
   objectUrl: string;
 };
+
+export type PhotoUploadContentType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/heic"
+  | "image/heif"
+  | "image/avif";
+
+export type GetPhotoUploadUrlRequest = {
+  contentType: PhotoUploadContentType;
+};
+
+export type GetPhotoUploadUrlResponse = {
+  uploadUrl: string;
+  objectUrl: string;
+};
