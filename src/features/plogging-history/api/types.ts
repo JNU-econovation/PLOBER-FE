@@ -28,3 +28,18 @@ export type PloggingSessionDetail = {
   mapImageUrl: string;
   photoUrls: string[];
 };
+
+export type GetMonthlyPloggingSummaryRequest = {
+  year: number;
+  month: number;
+};
+
+export type MonthlyPloggingSummary = {
+  year: number;
+  month: number;
+  totalStepCount: number;
+  totalDistanceMeters: number;
+  totalCaloriesBurned: number;
+  totalPloggingCount: number;
+  totalPloggingSeconds: number;
+};
