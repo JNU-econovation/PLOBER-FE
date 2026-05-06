@@ -21,6 +21,12 @@ export default ({ config }) => ({
       NSLocationAlwaysAndWhenInUseUsageDescription: "백그라운드에서도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
+        NSExceptionDomains: {
+          "ec2-13-125-28-197.ap-northeast-2.compute.amazonaws.com": {
+            NSExceptionAllowsInsecureHTTPLoads: true,
+            NSIncludesSubdomains: true,
+          },
+        },
       },
     },
   },
