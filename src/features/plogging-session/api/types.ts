@@ -27,3 +27,20 @@ export type CompletePloggingSessionRequest = {
 export type CompletePloggingSessionResponse = {
   ploggingSessionId: number;
 };
+
+export type MapImageUploadContentType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/heic"
+  | "image/heif"
+  | "image/avif";
+
+export type GetMapImageUploadUrlRequest = {
+  contentType: MapImageUploadContentType;
+};
+
+export type GetMapImageUploadUrlResponse = {
+  uploadUrl: string;
+  objectUrl: string;
+};
