@@ -9,7 +9,6 @@ import {
   MapControls,
   PauseGlyph,
   PlayGlyph,
-  RoutePin,
   ScreenRoot,
   StatNumber,
 } from "@/src/shared/ui";
@@ -71,9 +70,6 @@ export function ActivePloggingScreen() {
         />
         {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
         <MapControls top={Math.max(insets.top, 44) + 184} />
-        <View style={styles.centerPin}>
-          <RoutePin large />
-        </View>
         {/* 하단 제스처 바 영역을 고려하여 bottom 위치 동적 할당 */}
         <ActionDock
           bottom={Math.max(insets.bottom, 24) + 24}
@@ -248,13 +244,6 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontSize: 11,
     fontWeight: "700",
-  },
-  centerPin: {
-    alignItems: "center",
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: "45%",
   },
   endButton: {
     alignItems: "center",

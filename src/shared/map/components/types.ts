@@ -10,4 +10,9 @@ export type PloggingMapProps = PropsWithChildren<{
    * API compatibility but intentionally ignore it.
    */
   zoom?: number;
+  /**
+   * When true (default), the native map shows the user's current location
+   * overlay and the camera follows it. Mock maps ignore this prop.
+   */
+  followUserLocation?: boolean;
 }>;
