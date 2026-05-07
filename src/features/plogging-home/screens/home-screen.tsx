@@ -26,7 +26,7 @@ export function HomeScreen() {
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
   // 탭바 실제 높이(navigation.tsx의 PloggingTabBar와 동일 공식)
-  const tabBarHeight = Math.max(insets.bottom, 16) + 60;
+  const tabBarHeight = 84 + insets.bottom;
   // 시안 기준 탭바 위 간격을 그대로 유지(safe-area 기기에서도 동일한 시각 비율)
   const startButtonOffset = 41;
   const reportButtonOffset = 63;
