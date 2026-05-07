@@ -8,10 +8,13 @@ import {
 } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { usePloggingSession } from "@/src/features/plogging-session";
+
 import { reportMetrics, type ReportMetric } from "../data/report-data";
+import { RouteSnapshotMap } from "../components/route-snapshot-map";
 
 export function ReportScreen() {
   const router = useRouter();
@@ -97,6 +100,9 @@ function ReportTitleBlock() {
 }
 
 function DistanceSummaryCard() {
+  const { mapImageUri, routePoints, setMapImageUri } = usePloggingSession();
+  const hasRoute = routePoints.length >= 2;
+
   return (
     <View style={styles.distanceCard}>
       <Text selectable style={styles.cardCaption}>
@@ -110,7 +116,26 @@ function DistanceSummaryCard() {
           </Text>
         </View>
       </View>
-      <View style={styles.miniMap}></View>
+      <View style={styles.miniMap}>
+        {mapImageUri ? (
+          <Image
+            accessibilityLabel="플로깅 경로 이미지"
+            source={{ uri: mapImageUri }}
+            style={styles.miniMapImage}
+          />
+        ) : hasRoute ? (
+          <RouteSnapshotMap
+            onCaptured={setMapImageUri}
+            routePoints={routePoints}
+          />
+        ) : (
+          <View style={styles.miniMapEmpty}>
+            <Text selectable style={styles.miniMapEmptyText}>
+              경로 정보가 없습니다.
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -321,7 +346,22 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 196,
     overflow: "hidden",
-    backgroundColor: "gray",
+    backgroundColor: colors.line,
+  },
+  miniMapImage: {
+    height: "100%",
+    resizeMode: "cover",
+    width: "100%",
+  },
+  miniMapEmpty: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  miniMapEmptyText: {
+    color: colors.subtle,
+    fontSize: 13,
+    fontWeight: "500",
   },
   miniRouteSketch: {
     height: 220,
