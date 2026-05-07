@@ -20,6 +20,7 @@ type PloggingSessionContextValue = {
   startCoord: RoutePoint | null;
   endCoord: RoutePoint | null;
   placeName: string;
+  mapImageUri: string | null;
 
   // 변경 액션
   addPhoto: (uri: string) => void;
@@ -27,6 +28,7 @@ type PloggingSessionContextValue = {
   appendRoutePoint: (point: RoutePoint) => void;
   addSteps: (delta: number) => void;
   setPlaceName: (name: string) => void;
+  setMapImageUri: (uri: string | null) => void;
   resetSession: () => void;
 };
 
@@ -41,6 +43,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
   const [startCoord, setStartCoord] = useState<RoutePoint | null>(null);
   const [endCoord, setEndCoord] = useState<RoutePoint | null>(null);
   const [placeName, setPlaceNameState] = useState("");
+  const [mapImageUri, setMapImageUriState] = useState<string | null>(null);
 
   const addPhoto = useCallback((uri: string) => {
     setPhotoUris((prev) => (prev.includes(uri) ? prev : [...prev, uri]));
@@ -77,6 +80,10 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     setPlaceNameState(name);
   }, []);
 
+  const setMapImageUri = useCallback((uri: string | null) => {
+    setMapImageUriState(uri);
+  }, []);
+
   const resetSession = useCallback(() => {
     setPhotoUris([]);
     setRoutePoints([]);
@@ -85,6 +92,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     setStartCoord(null);
     setEndCoord(null);
     setPlaceNameState("");
+    setMapImageUriState(null);
   }, []);
 
   const value = useMemo<PloggingSessionContextValue>(
@@ -95,11 +103,13 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       caloriesBurned: caloriesFromSteps(stepCount),
       distanceMeters,
       endCoord,
+      mapImageUri,
       photoUris,
       placeName,
       removePhoto,
       resetSession,
       routePoints,
+      setMapImageUri,
       setPlaceName,
       startCoord,
       stepCount,
@@ -110,11 +120,13 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       appendRoutePoint,
       distanceMeters,
       endCoord,
+      mapImageUri,
       photoUris,
       placeName,
       removePhoto,
       resetSession,
       routePoints,
+      setMapImageUri,
       setPlaceName,
       startCoord,
       stepCount,
