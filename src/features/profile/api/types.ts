@@ -4,6 +4,16 @@ export type UserProfile = {
   profileImageUrl: string | null;
 };
 
+export type GetMyPloggingStatsRequest = {
+  userId: number;
+};
+
+export type MyPloggingStats = {
+  totalPloggingCount: number;
+  totalStepCount: number;
+  totalDistanceMeters: number;
+};
+
 export type UpdateMyNicknameRequest = {
   nickname: string;
   userId: number;
