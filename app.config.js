@@ -20,6 +20,7 @@ export default ({ config }) => ({
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
       NSLocationAlwaysAndWhenInUseUsageDescription: "백그라운드에서도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
       NSPhotoLibraryUsageDescription: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
+      NSCameraUsageDescription: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
         NSExceptionDomains: {
@@ -70,6 +71,7 @@ export default ({ config }) => ({
       "expo-image-picker",
       {
         photosPermission: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
+        cameraPermission: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
       },
     ],
     [
