@@ -21,10 +21,12 @@ import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows, typography } from "@/src/shared/theme";
 
 import {
+  getMyPloggingStats,
   getProfileImageUploadUrl,
   getUserProfile,
   updateMyNickname,
   updateMyProfileImage,
+  type MyPloggingStats,
   type UserProfile,
 } from "../api";
 import {
@@ -71,8 +73,13 @@ export function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { session, status } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [ploggingStats, setPloggingStats] =
+    useState<MyPloggingStats | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [ploggingStatsError, setPloggingStatsError] = useState<string | null>(
+    null
+  );
   const [nicknameDraft, setNicknameDraft] = useState("");
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [nicknameModalVisible, setNicknameModalVisible] = useState(false);
@@ -86,6 +93,7 @@ export function ProfileScreen() {
     if (status === "loading") return;
     if (status !== "authenticated") {
       setProfile(null);
+      setPloggingStats(null);
       return;
     }
     if (!session?.userId) return;
@@ -93,18 +101,34 @@ export function ProfileScreen() {
     let mounted = true;
     setLoadingProfile(true);
     setProfileError(null);
+    setPloggingStatsError(null);
 
-    getUserProfile(session.userId)
-      .then((nextProfile) => {
-        if (mounted) setProfile(nextProfile);
-      })
-      .catch((error) => {
+    Promise.allSettled([
+      getUserProfile(session.userId),
+      getMyPloggingStats({ userId: session.userId }),
+    ])
+      .then(([profileResult, ploggingStatsResult]) => {
         if (!mounted) return;
-        setProfileError(
-          error instanceof Error
-            ? error.message
-            : "프로필 정보를 불러오지 못했습니다."
-        );
+
+        if (profileResult.status === "fulfilled") {
+          setProfile(profileResult.value);
+        } else {
+          setProfileError(
+            profileResult.reason instanceof Error
+              ? profileResult.reason.message
+              : "프로필 정보를 불러오지 못했습니다."
+          );
+        }
+
+        if (ploggingStatsResult.status === "fulfilled") {
+          setPloggingStats(ploggingStatsResult.value);
+        } else {
+          setPloggingStatsError(
+            ploggingStatsResult.reason instanceof Error
+              ? ploggingStatsResult.reason.message
+              : "누적 통계를 불러오지 못했습니다."
+          );
+        }
       })
       .finally(() => {
         if (mounted) setLoadingProfile(false);
@@ -299,13 +323,18 @@ export function ProfileScreen() {
             {profileImageError}
           </Text>
         ) : null}
+        {ploggingStatsError ? (
+          <Text selectable style={styles.errorText}>
+            {ploggingStatsError}
+          </Text>
+        ) : null}
         <ProfileOverview
           loading={loadingProfile}
           onChangeProfileImage={handleChangeProfileImage}
           profile={displayedProfile}
           uploadingProfileImage={uploadingProfileImage}
         />
-        <SummaryStatsCard />
+        <SummaryStatsCard stats={ploggingStats} />
         <ActivityCalendar />
       </ScrollView>
       <NicknameEditModal
@@ -510,10 +539,56 @@ function ProfileAvatar({
   );
 }
 
-function SummaryStatsCard() {
+type SummaryStat = {
+  label: string;
+  unit: string;
+  value: string;
+};
+
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat("ko-KR", {
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatDistanceKilometers(distanceMeters: number) {
+  const kilometers = distanceMeters / 1000;
+  return formatCompactNumber(kilometers);
+}
+
+function formatTenThousandSteps(stepCount: number) {
+  const tenThousandSteps = stepCount / 10000;
+  return formatCompactNumber(tenThousandSteps);
+}
+
+function getSummaryStats(stats: MyPloggingStats | null): SummaryStat[] {
+  if (!stats) return [...profileSummaryStats];
+
+  return [
+    {
+      label: "플로깅",
+      value: formatCompactNumber(stats.totalPloggingCount),
+      unit: "회",
+    },
+    {
+      label: "총 누적 걸음",
+      value: formatTenThousandSteps(stats.totalStepCount),
+      unit: "만보",
+    },
+    {
+      label: "총 누적 거리",
+      value: formatDistanceKilometers(stats.totalDistanceMeters),
+      unit: "km",
+    },
+  ];
+}
+
+function SummaryStatsCard({ stats }: { stats: MyPloggingStats | null }) {
+  const summaryStats = getSummaryStats(stats);
+
   return (
     <View style={styles.summaryCard}>
-      {profileSummaryStats.map((stat) => (
+      {summaryStats.map((stat) => (
         <View key={stat.label} style={styles.summaryItem}>
           <Text selectable style={styles.summaryValue}>
             {stat.value}
