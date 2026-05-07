@@ -1,6 +1,7 @@
 export type UserProfile = {
   nickname: string;
   level: number;
+  title: string;
   profileImageUrl: string | null;
 };
 

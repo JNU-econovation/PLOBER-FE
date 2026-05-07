@@ -142,6 +142,7 @@ export function ProfileScreen() {
   const displayedProfile = {
     nickname: profile?.nickname ?? session?.nickname ?? "플로버",
     level: profile?.level ?? 1,
+    title: profile?.title ?? "",
     profileImageUrl: profile?.profileImageUrl ?? null,
   };
 
@@ -181,6 +182,7 @@ export function ProfileScreen() {
       setProfile((currentProfile) => ({
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: updatedNickname.nickname,
+        title: currentProfile?.title ?? displayedProfile.title,
         profileImageUrl:
           currentProfile?.profileImageUrl ?? displayedProfile.profileImageUrl,
       }));
@@ -287,6 +289,7 @@ export function ProfileScreen() {
       setProfile((currentProfile) => ({
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: currentProfile?.nickname ?? displayedProfile.nickname,
+        title: currentProfile?.title ?? displayedProfile.title,
         profileImageUrl: nextProfileImageUrl,
       }));
     } catch (error) {
@@ -482,7 +485,7 @@ function ProfileOverview({
             </Text>
           </View>
           <Text selectable style={styles.levelTitle}>
-            길거리 수호자
+            {profile.title}
           </Text>
           {loading ? <ActivityIndicator color={colors.primary} size="small" /> : null}
         </View>
