@@ -3,7 +3,9 @@ export {
   PloggingSessionProvider,
   usePloggingSession,
 } from "./hooks/use-plogging-session";
+export { usePloggingTracker } from "./hooks/use-plogging-tracker";
+export type { PloggingTrackerState } from "./hooks/use-plogging-tracker";
 export { capturePloggingPhoto } from "./services/capture-plogging-photo";
 export type { CapturePloggingPhotoResult } from "./services/capture-plogging-photo";
+export { caloriesFromSteps } from "./services/calculate-calories";
 export * from "./api";
-export * from "./data/activity-data";
