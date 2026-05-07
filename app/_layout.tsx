@@ -4,15 +4,18 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AuthSessionProvider, useAuthSession } from "@/src/features/auth";
+import { PloggingSessionProvider } from "@/src/features/plogging-session";
 import { colors } from "@/src/shared/theme";
 
 export default function RootLayout() {
   return (
     <AuthSessionProvider>
-      <StatusBar style="dark" />
-      <AuthGate>
-        <RootStack />
-      </AuthGate>
+      <PloggingSessionProvider>
+        <StatusBar style="dark" />
+        <AuthGate>
+          <RootStack />
+        </AuthGate>
+      </PloggingSessionProvider>
     </AuthSessionProvider>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
@@ -14,12 +15,28 @@ import {
 } from "@/src/shared/ui";
 
 import { activeStats } from "../data/activity-data";
+import { usePloggingSession } from "../hooks/use-plogging-session";
 import { usePloggingTimer } from "../hooks/use-plogging-timer";
+import { capturePloggingPhoto } from "../services/capture-plogging-photo";
 
 export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
   const timer = usePloggingTimer();
+  const { addPhoto, photoUris, resetSession } = usePloggingSession();
+
+  // 새 세션 시작 시 이전 세션의 누적 사진을 비운다.
+  // 사용자가 /report 까지 갔다가 뒤로 와서 새로 시작하는 경우에도 같은 화면이 다시 mount 되므로 안전하다.
+  useEffect(() => {
+    resetSession();
+  }, [resetSession]);
+
+  const handleCapturePhoto = async () => {
+    const result = await capturePloggingPhoto();
+    if (result.status === "captured") {
+      addPhoto(result.uri);
+    }
+  };
 
   return (
     <ScreenRoot>
@@ -38,8 +55,10 @@ export function ActivePloggingScreen() {
         <ActionDock
           bottom={Math.max(insets.bottom, 24) + 24}
           isPaused={timer.isPaused}
+          onCapturePhoto={handleCapturePhoto}
           onEnd={() => router.push("/report")}
           onTogglePause={timer.toggle}
+          photoCount={photoUris.length}
         />
       </PloggingMap>
     </ScreenRoot>
@@ -90,26 +109,43 @@ function PloggingTimerCard({
 }
 
 function ActionDock({
+  onCapturePhoto,
   onEnd,
   bottom,
   isPaused,
   onTogglePause,
+  photoCount,
 }: {
+  onCapturePhoto: () => void;
   onEnd: () => void;
   bottom: number;
   isPaused: boolean;
   onTogglePause: () => void;
+  photoCount: number;
 }) {
   const pauseLabel = isPaused ? "재개" : "일시 정지";
+  const cameraLabel =
+    photoCount > 0 ? `사진 촬영 (${photoCount}장 촬영됨)` : "사진 촬영";
   return (
     <View style={[styles.actionDock, { bottom }]}>
       <Pressable
-        accessibilityLabel="사진 촬영"
+        accessibilityLabel={cameraLabel}
         accessibilityRole="button"
         hitSlop={8}
-        style={({ pressed }) => (pressed ? styles.pressed : null)}
+        onPress={onCapturePhoto}
+        style={({ pressed }) => [
+          styles.cameraButton,
+          pressed ? styles.pressed : null,
+        ]}
       >
         <CameraGlyph light />
+        {photoCount > 0 ? (
+          <View style={styles.photoBadge}>
+            <Text selectable style={styles.photoBadgeText}>
+              {photoCount > 99 ? "99+" : String(photoCount)}
+            </Text>
+          </View>
+        ) : null}
       </Pressable>
       <Pressable
         accessibilityLabel={pauseLabel}
@@ -159,6 +195,26 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 24,
     ...shadows.button,
+  },
+  cameraButton: {
+    position: "relative",
+  },
+  photoBadge: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    height: 20,
+    justifyContent: "center",
+    minWidth: 20,
+    paddingHorizontal: 5,
+    position: "absolute",
+    right: -6,
+    top: -6,
+  },
+  photoBadgeText: {
+    color: colors.surface,
+    fontSize: 11,
+    fontWeight: "700",
   },
   centerPin: {
     alignItems: "center",
