@@ -18,7 +18,7 @@ export default ({ config }) => ({
     // iOS 위치 권한 메시지 추가
     infoPlist: {
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
-      NSLocationAlwaysAndWhenInUseUsageDescription: "백그라운드에서도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
+      NSMotionUsageDescription: "플로깅 중 걸음 수를 측정하기 위해 동작 인식 권한이 필요합니다.",
       NSPhotoLibraryUsageDescription: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
       NSCameraUsageDescription: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
       NSAppTransportSecurity: {
@@ -50,11 +50,11 @@ export default ({ config }) => ({
     usesCleartextTraffic: true,
     predictiveBackGestureEnabled: false,
     package: "com.lewis.myproject",
-    // Android 위치 권한 추가
+    // Android 권한: 포그라운드 위치 + 만보기
     permissions: [
       "ACCESS_COARSE_LOCATION",
       "ACCESS_FINE_LOCATION",
-      "ACCESS_BACKGROUND_LOCATION" // 백그라운드 추적이 필요하다면 추가
+      "ACTIVITY_RECOGNITION",
     ],
   },
   
@@ -67,6 +67,14 @@ export default ({ config }) => ({
     "expo-router",
     "expo-web-browser",
     "expo-secure-store",
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+      },
+    ],
     [
       "expo-image-picker",
       {

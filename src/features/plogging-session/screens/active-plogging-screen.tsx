@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
@@ -14,22 +14,35 @@ import {
   StatNumber,
 } from "@/src/shared/ui";
 
-import { activeStats } from "../data/activity-data";
 import { usePloggingSession } from "../hooks/use-plogging-session";
 import { usePloggingTimer } from "../hooks/use-plogging-timer";
+import { usePloggingTracker } from "../hooks/use-plogging-tracker";
 import { capturePloggingPhoto } from "../services/capture-plogging-photo";
+
+type LiveStat = { label: string; unit: string; value: string };
 
 export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
   const timer = usePloggingTimer();
-  const { addPhoto, photoUris, resetSession } = usePloggingSession();
+  const {
+    addPhoto,
+    caloriesBurned,
+    distanceMeters,
+    photoUris,
+    resetSession,
+    stepCount,
+  } = usePloggingSession();
 
-  // 새 세션 시작 시 이전 세션의 누적 사진을 비운다.
+  // 새 세션 시작 시 이전 세션의 누적 데이터(사진/좌표/걸음 등)를 비운다.
   // 사용자가 /report 까지 갔다가 뒤로 와서 새로 시작하는 경우에도 같은 화면이 다시 mount 되므로 안전하다.
   useEffect(() => {
     resetSession();
   }, [resetSession]);
+
+  // GPS + 만보기 구독은 화면이 마운트되어 있는 동안에만 동작한다.
+  // 일시정지 시 누적이 멈추고, 화면 unmount 시 자동으로 해제된다.
+  usePloggingTracker({ isPaused: timer.isPaused });
 
   const handleCapturePhoto = async () => {
     const result = await capturePloggingPhoto();
@@ -38,12 +51,22 @@ export function ActivePloggingScreen() {
     }
   };
 
+  const liveStats = useMemo<LiveStat[]>(
+    () => [
+      { label: "거리", unit: "km", value: formatKilometers(distanceMeters) },
+      { label: "걸음", unit: "보", value: formatInteger(stepCount) },
+      { label: "소모", unit: "kcal", value: formatInteger(caloriesBurned) },
+    ],
+    [caloriesBurned, distanceMeters, stepCount]
+  );
+
   return (
     <ScreenRoot>
       <PloggingMap dimmed zoom={17}>
         {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
         <PloggingTimerCard
           formattedElapsed={timer.formatted}
+          stats={liveStats}
           top={Math.max(insets.top, 44) + 16}
         />
         {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
@@ -65,12 +88,22 @@ export function ActivePloggingScreen() {
   );
 }
 
+function formatKilometers(meters: number): string {
+  return (meters / 1000).toFixed(2);
+}
+
+function formatInteger(value: number): string {
+  return Math.round(value).toLocaleString("ko-KR");
+}
+
 function PloggingTimerCard({
   top,
   formattedElapsed,
+  stats,
 }: {
   top: number;
   formattedElapsed: string;
+  stats: LiveStat[];
 }) {
   return (
     <View style={[styles.timerCard, { top }]}>
@@ -87,7 +120,7 @@ function PloggingTimerCard({
         {formattedElapsed}
       </Text>
       <View style={styles.statsRow}>
-        {activeStats.map((stat, index) => (
+        {stats.map((stat, index) => (
           <View key={stat.label} style={styles.statItem}>
             <Text numberOfLines={1} selectable style={styles.statLabel}>
               {stat.label}
@@ -98,7 +131,7 @@ function PloggingTimerCard({
               unit={stat.unit}
               value={stat.value}
             />
-            {index < activeStats.length - 1 ? (
+            {index < stats.length - 1 ? (
               <View style={styles.statDivider} />
             ) : null}
           </View>
