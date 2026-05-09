@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { usePloggingSession } from "@/src/features/plogging-session";
+import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 
 import { reportMetrics, type ReportMetric } from "../data/report-data";
 import { RouteSnapshotMap } from "../components/route-snapshot-map";

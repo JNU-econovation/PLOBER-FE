@@ -4,7 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AuthSessionProvider, useAuthSession } from "@/src/features/auth";
-import { PloggingSessionProvider } from "@/src/features/plogging-session";
+import { PloggingSessionProvider } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { colors } from "@/src/shared/theme";
 
 export default function RootLayout() {
