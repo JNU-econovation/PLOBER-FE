@@ -32,6 +32,7 @@ function RootStack() {
       <Stack.Screen name="plogging" />
       <Stack.Screen name="report" />
       <Stack.Screen name="Map" />
+      <Stack.Screen name="plogging-sessions/[id]" />
     </Stack>
   );
 }

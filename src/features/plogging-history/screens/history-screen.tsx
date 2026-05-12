@@ -1,11 +1,13 @@
 import {
   ActivityIndicator,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { weeklyBars } from "../data/history-data";
@@ -181,8 +183,23 @@ function MonthlyChartCard() {
 }
 
 function RecordRow({ session }: { session: PloggingSessionSummary }) {
+  const router = useRouter();
+
   return (
-    <View style={styles.recordRow}>
+    <Pressable
+      accessibilityLabel={`${session.placeName} 플로깅 기록 상세 보기`}
+      accessibilityRole="button"
+      onPress={() =>
+        router.push({
+          pathname: "/plogging-sessions/[id]",
+          params: { id: String(session.ploggingSessionId) },
+        })
+      }
+      style={({ pressed }) => [
+        styles.recordRow,
+        pressed ? styles.recordRowPressed : null,
+      ]}
+    >
       <MiniGlyph background={MOCK_GLYPH_BACKGROUND} color={MOCK_GLYPH_COLOR} />
       <View style={styles.recordCopy}>
         <Text selectable style={styles.recordPlace}>
@@ -199,7 +216,7 @@ function RecordRow({ session }: { session: PloggingSessionSummary }) {
           value={formatKilometers(session.distanceMeters)}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -369,6 +386,9 @@ const styles = StyleSheet.create({
     gap: 15,
     minHeight: 77,
     paddingHorizontal: 16,
+  },
+  recordRowPressed: {
+    opacity: 0.7,
   },
   recordTime: {
     color: "#616161",
