@@ -17,6 +17,7 @@ import { usePloggingSession } from "../hooks/use-plogging-session";
 import { usePloggingTimer } from "../hooks/use-plogging-timer";
 import { usePloggingTracker } from "../hooks/use-plogging-tracker";
 import { capturePloggingPhoto } from "../services/capture-plogging-photo";
+import { uploadPloggingPhoto } from "../services/upload-plogging-photo";
 
 type LiveStat = { label: string; unit: string; value: string };
 
@@ -26,6 +27,7 @@ export function ActivePloggingScreen() {
   const timer = usePloggingTimer();
   const {
     addPhoto,
+    addPhotoObjectUrl,
     caloriesBurned,
     distanceMeters,
     photoUris,
@@ -45,9 +47,17 @@ export function ActivePloggingScreen() {
 
   const handleCapturePhoto = async () => {
     const result = await capturePloggingPhoto();
-    if (result.status === "captured") {
-      addPhoto(result.uri);
-    }
+    if (result.status !== "captured") return;
+
+    addPhoto(result.uri);
+
+    // 백그라운드로 S3 업로드. 사용자 동선은 막지 않고, 실패해도 다음 사진에 영향 없음.
+    void (async () => {
+      const uploadResult = await uploadPloggingPhoto(result.uri, "image/jpeg");
+      if (uploadResult.status === "uploaded") {
+        addPhotoObjectUrl(result.uri, uploadResult.objectUrl);
+      }
+    })();
   };
 
   const liveStats = useMemo<LiveStat[]>(
