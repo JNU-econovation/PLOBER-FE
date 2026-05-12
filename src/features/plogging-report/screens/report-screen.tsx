@@ -8,10 +8,12 @@ import {
 } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useEffect, useRef } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
+import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
 
 import { reportMetrics, type ReportMetric } from "../data/report-data";
 import { RouteSnapshotMap } from "../components/route-snapshot-map";
@@ -100,8 +102,40 @@ function ReportTitleBlock() {
 }
 
 function DistanceSummaryCard() {
-  const { mapImageUri, routePoints, setMapImageUri } = usePloggingSession();
+  const {
+    mapImageObjectUrl,
+    mapImageUri,
+    routePoints,
+    setMapImageObjectUrl,
+    setMapImageUri,
+  } = usePloggingSession();
   const hasRoute = routePoints.length >= 2;
+  const uploadedUriRef = useRef<string | null>(null);
+
+  // 로컬 캡처가 끝나면 백그라운드로 S3 업로드 → objectUrl을 세션에 보관.
+  // 같은 URI에 대해 중복 업로드되지 않도록 ref로 가드한다.
+  useEffect(() => {
+    if (!mapImageUri) return;
+    if (mapImageObjectUrl) return;
+    if (uploadedUriRef.current === mapImageUri) return;
+    uploadedUriRef.current = mapImageUri;
+
+    let cancelled = false;
+    void (async () => {
+      const result = await uploadMapImage(mapImageUri, "image/png");
+      if (cancelled) return;
+      if (result.status === "uploaded") {
+        setMapImageObjectUrl(result.objectUrl);
+      } else {
+        // 실패 시 다음 mount/재시도에 다시 시도할 수 있도록 가드 해제.
+        uploadedUriRef.current = null;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapImageObjectUrl, mapImageUri, setMapImageObjectUrl]);
 
   return (
     <View style={styles.distanceCard}>
