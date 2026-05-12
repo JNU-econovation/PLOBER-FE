@@ -13,6 +13,8 @@ import { caloriesFromSteps } from "../services/calculate-calories";
 type PloggingSessionContextValue = {
   // 누적 데이터
   photoUris: string[];
+  // 로컬 URI → S3 objectUrl 매핑. 업로드 성공한 사진만 키로 존재한다.
+  photoObjectUrls: Record<string, string>;
   routePoints: RoutePoint[];
   distanceMeters: number;
   stepCount: number;
@@ -26,6 +28,7 @@ type PloggingSessionContextValue = {
   // 변경 액션
   addPhoto: (uri: string) => void;
   removePhoto: (uri: string) => void;
+  addPhotoObjectUrl: (localUri: string, objectUrl: string) => void;
   appendRoutePoint: (point: RoutePoint) => void;
   addSteps: (delta: number) => void;
   setPlaceName: (name: string) => void;
@@ -39,6 +42,9 @@ const PloggingSessionContext =
 
 export function PloggingSessionProvider({ children }: { children: ReactNode }) {
   const [photoUris, setPhotoUris] = useState<string[]>([]);
+  const [photoObjectUrls, setPhotoObjectUrls] = useState<
+    Record<string, string>
+  >({});
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>([]);
   const [distanceMeters, setDistanceMeters] = useState(0);
   const [stepCount, setStepCount] = useState(0);
@@ -56,7 +62,22 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
 
   const removePhoto = useCallback((uri: string) => {
     setPhotoUris((prev) => prev.filter((existing) => existing !== uri));
+    setPhotoObjectUrls((prev) => {
+      if (!(uri in prev)) return prev;
+      const { [uri]: _removed, ...rest } = prev;
+      return rest;
+    });
   }, []);
+
+  const addPhotoObjectUrl = useCallback(
+    (localUri: string, objectUrl: string) => {
+      setPhotoObjectUrls((prev) => {
+        if (prev[localUri] === objectUrl) return prev;
+        return { ...prev, [localUri]: objectUrl };
+      });
+    },
+    []
+  );
 
   // 좌표 한 개 추가 시 거리/시작-종료 좌표를 함께 갱신.
   // 거리 계산은 이전 마지막 좌표와의 haversine으로 누적한다.
@@ -95,6 +116,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
 
   const resetSession = useCallback(() => {
     setPhotoUris([]);
+    setPhotoObjectUrls({});
     setRoutePoints([]);
     setDistanceMeters(0);
     setStepCount(0);
@@ -108,6 +130,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PloggingSessionContextValue>(
     () => ({
       addPhoto,
+      addPhotoObjectUrl,
       addSteps,
       appendRoutePoint,
       caloriesBurned: caloriesFromSteps(stepCount),
@@ -115,6 +138,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       endCoord,
       mapImageObjectUrl,
       mapImageUri,
+      photoObjectUrls,
       photoUris,
       placeName,
       removePhoto,
@@ -128,12 +152,14 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     }),
     [
       addPhoto,
+      addPhotoObjectUrl,
       addSteps,
       appendRoutePoint,
       distanceMeters,
       endCoord,
       mapImageObjectUrl,
       mapImageUri,
+      photoObjectUrls,
       photoUris,
       placeName,
       removePhoto,

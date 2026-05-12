@@ -10,4 +10,6 @@ export type { CapturePloggingPhotoResult } from "./services/capture-plogging-pho
 export { caloriesFromSteps } from "./services/calculate-calories";
 export { uploadMapImage } from "./services/upload-map-image";
 export type { UploadMapImageResult } from "./services/upload-map-image";
+export { uploadPloggingPhoto } from "./services/upload-plogging-photo";
+export type { UploadPloggingPhotoResult } from "./services/upload-plogging-photo";
 export * from "./api";
