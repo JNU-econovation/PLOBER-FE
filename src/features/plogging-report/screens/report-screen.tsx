@@ -109,7 +109,8 @@ function DistanceSummaryCard() {
     setMapImageObjectUrl,
     setMapImageUri,
   } = usePloggingSession();
-  const hasRoute = routePoints.length >= 2;
+  // 좌표가 1개라도 있으면 마커로 캡처, 0개일 때만 placeholder.
+  const hasRoute = routePoints.length >= 1;
   const uploadedUriRef = useRef<string | null>(null);
 
   // 로컬 캡처가 끝나면 백그라운드로 S3 업로드 → objectUrl을 세션에 보관.

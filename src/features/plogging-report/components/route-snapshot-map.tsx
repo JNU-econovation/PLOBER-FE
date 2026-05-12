@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import {
+  NaverMapMarkerOverlay,
   NaverMapPolylineOverlay,
   NaverMapView,
 } from "@mj-studio/react-native-naver-map";
@@ -85,6 +86,11 @@ export function RouteSnapshotMap({
             color={colors.primary}
             coords={routePoints}
             width={8}
+          />
+        ) : routePoints.length === 1 ? (
+          <NaverMapMarkerOverlay
+            latitude={routePoints[0].latitude}
+            longitude={routePoints[0].longitude}
           />
         ) : null}
       </NaverMapView>
