@@ -1,12 +1,16 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  historyRecords,
-  weeklyBars,
-  type HistoryRecord,
-} from "../data/history-data";
+import { weeklyBars } from "../data/history-data";
+import { usePloggingSessions } from "../hooks/use-plogging-sessions";
+import type { PloggingSessionSummary } from "../api/types";
 import {
   MiniGlyph,
   ScreenRoot,
@@ -14,6 +18,12 @@ import {
   TopInset,
 } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
+
+// 모드별 색 구분이 확정되기 전까지 모든 항목에 동일한 초록 톤 mock 사용.
+const MOCK_GLYPH_COLOR = "#7BC47F";
+const MOCK_GLYPH_BACKGROUND = "#EFF7EF";
+
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 export function HistoryScreen() {
   const insets = useSafeAreaInsets();
@@ -37,13 +47,49 @@ export function HistoryScreen() {
         <Text selectable style={styles.recentTitle}>
           최근 기록
         </Text>
-        <View style={styles.recordCard}>
-          {historyRecords.map((record, index) => (
-            <RecordRow key={`${record.place}-${index}`} record={record} />
-          ))}
-        </View>
+        <RecentRecordsSection />
       </ScrollView>
     </ScreenRoot>
+  );
+}
+
+function RecentRecordsSection() {
+  const state = usePloggingSessions();
+
+  if (state.status === "loading" || state.status === "idle") {
+    return (
+      <View style={[styles.recordCard, styles.recordPlaceholder]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <View style={[styles.recordCard, styles.recordPlaceholder]}>
+        <Text selectable style={styles.recordPlaceholderText}>
+          {state.message}
+        </Text>
+      </View>
+    );
+  }
+
+  if (state.sessions.length === 0) {
+    return (
+      <View style={[styles.recordCard, styles.recordPlaceholder]}>
+        <Text selectable style={styles.recordPlaceholderText}>
+          아직 플로깅 기록이 없습니다.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.recordCard}>
+      {state.sessions.map((session) => (
+        <RecordRow key={session.ploggingSessionId} session={session} />
+      ))}
+    </View>
   );
 }
 
@@ -134,23 +180,53 @@ function MonthlyChartCard() {
   );
 }
 
-function RecordRow({ record }: { record: HistoryRecord }) {
+function RecordRow({ session }: { session: PloggingSessionSummary }) {
   return (
     <View style={styles.recordRow}>
-      <MiniGlyph background={record.background} color={record.color} />
+      <MiniGlyph background={MOCK_GLYPH_BACKGROUND} color={MOCK_GLYPH_COLOR} />
       <View style={styles.recordCopy}>
         <Text selectable style={styles.recordPlace}>
-          {record.place}
+          {session.placeName}
         </Text>
         <Text selectable style={styles.recordTime}>
-          {record.time}
+          {formatSessionTimeRange(session.startedAt, session.finishedAt)}
         </Text>
       </View>
       <View style={styles.recordDistance}>
-        <StatNumber size={18} unit="km" value={record.distance} />
+        <StatNumber
+          size={18}
+          unit="km"
+          value={formatKilometers(session.distanceMeters)}
+        />
       </View>
     </View>
   );
+}
+
+function formatKilometers(meters: number): string {
+  return (meters / 1000).toFixed(2);
+}
+
+// "4월 21일 화 12:56 - 13:34" 형태로 만든다.
+// startedAt / finishedAt은 ISO 형식 문자열 (예: "2026-04-24T18:21:00").
+function formatSessionTimeRange(startedAt: string, finishedAt: string): string {
+  const start = new Date(startedAt);
+  const end = new Date(finishedAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return `${startedAt} - ${finishedAt}`;
+  }
+
+  const month = start.getMonth() + 1;
+  const day = start.getDate();
+  const weekday = WEEKDAY_KO[start.getDay()];
+
+  return `${month}월 ${day}일 ${weekday} ${formatHm(start)} - ${formatHm(end)}`;
+}
+
+function formatHm(date: Date): string {
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 const styles = StyleSheet.create({
@@ -261,6 +337,19 @@ const styles = StyleSheet.create({
   recordCopy: {
     flex: 1,
     gap: 8,
+  },
+  recordPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 96,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  recordPlaceholderText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
   },
   recordDistance: {
     alignItems: "flex-end",
