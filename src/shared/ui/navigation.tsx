@@ -2,11 +2,10 @@ import { Image } from "expo-image";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconSource = ComponentProps<typeof Image>["source"];
 
-const TAB_BAR_HEIGHT = 84;
+export const TAB_BAR_HEIGHT = 84;
 const TAB_ICON_SIZE = 36;
 
 const tabConfig: Record<
@@ -39,13 +38,8 @@ export function PloggingTabBar({
   navigation,
   state,
 }: BottomTabBarProps) {
-  const insets = useSafeAreaInsets();
-
   return (
-    <View
-      accessibilityRole="tablist"
-      style={[styles.bottomTabs, { height: TAB_BAR_HEIGHT + insets.bottom }]}
-    >
+    <View accessibilityRole="tablist" style={styles.bottomTabs}>
       <View style={styles.tabRow}>
         {state.routes.map((route, index) => {
           const selected = state.index === index;
@@ -105,6 +99,7 @@ const styles = StyleSheet.create({
   bottomTabs: {
     backgroundColor: "#FAFAFA",
     bottom: 0,
+    height: TAB_BAR_HEIGHT,
     left: 0,
     position: "absolute",
     right: 0,

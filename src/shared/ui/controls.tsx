@@ -1,10 +1,12 @@
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import type { ComponentProps } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
   View,
+  type ImageStyle,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -14,7 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, shadows } from "../theme";
 
 type FeatherName = ComponentProps<typeof Feather>["name"];
+type MapControlIconSource = ComponentProps<typeof Image>["source"];
 export type PloggingMode = "free" | "ai";
+
+const mapControlWeatherIcon: MapControlIconSource =
+  require("@/assets/icons/map-control-weather.png");
+const mapControlRestroomIcon: MapControlIconSource =
+  require("@/assets/icons/map-control-restroom.png");
 
 export function IconCircleButton({
   name,
@@ -55,12 +63,65 @@ export function IconCircleButton({
   );
 }
 
+export function BackButton({
+  onPress,
+  style,
+}: {
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel="뒤로가기"
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.backButton,
+        pressed ? styles.pressed : null,
+        style,
+      ]}
+    >
+      <Feather color="#33363F" name="chevron-left" size={24} />
+    </Pressable>
+  );
+}
+
 export function MapControls({ top = 176 }: { top?: number }) {
   return (
     <View style={[styles.mapControls, { top }]}>
-      <IconCircleButton label="날씨" name="sun" />
-      <IconCircleButton label="쓰레기통" name="trash-2" />
+      <FigmaMapControlButton label="날씨" source={mapControlWeatherIcon} />
+      <FigmaMapControlButton label="화장실" source={mapControlRestroomIcon} />
     </View>
+  );
+}
+
+function FigmaMapControlButton({
+  label,
+  onPress,
+  source,
+}: {
+  label: string;
+  onPress?: () => void;
+  source: MapControlIconSource;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.figmaIconCircle,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Image
+        contentFit="contain"
+        source={source}
+        style={styles.figmaMapIcon}
+      />
+    </Pressable>
   );
 }
 
@@ -163,6 +224,9 @@ function ModeOption({
 
 const styles = StyleSheet.create<{
   iconCircle: ViewStyle;
+  backButton: ViewStyle;
+  figmaIconCircle: ViewStyle;
+  figmaMapIcon: ImageStyle;
   pressed: ViewStyle;
   mapControls: ViewStyle;
   primaryBottomButton: ViewStyle;
@@ -178,6 +242,28 @@ const styles = StyleSheet.create<{
     backgroundColor: colors.surface,
     justifyContent: "center",
     ...shadows.soft,
+  },
+  figmaIconCircle: {
+    alignItems: "center",
+    backgroundColor: "#FAFAFA",
+    borderRadius: 23,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+    ...shadows.soft,
+  },
+  figmaMapIcon: {
+    height: 24,
+    width: 24,
+  },
+  backButton: {
+    alignItems: "center",
+    backgroundColor: "#FAFAFA",
+    borderRadius: 12,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+    boxShadow: "0 0 21.2px rgba(0, 0, 0, 0.07)",
   },
   pressed: {
     opacity: 0.72,
