@@ -1,13 +1,20 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import type { ComponentProps } from "react";
 import {
   StyleSheet,
   Text,
   View,
+  type ImageStyle,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 
-import { colors, typography } from "../theme";
+import { colors, shadows, typography } from "../theme";
+
+type IconSource = ComponentProps<typeof Image>["source"];
+
+const cameraIcon: IconSource = require("@/assets/icons/camera-report.png");
 
 export function StatNumber({
   value,
@@ -60,10 +67,14 @@ export function MiniGlyph({
   );
 }
 
-export function CameraGlyph({ light = false }: { light?: boolean }) {
+export function CameraGlyph({ light: _light = false }: { light?: boolean }) {
   return (
-    <View style={[styles.cameraGlyph, light ? styles.cameraGlyphLight : null]}>
-      <Feather color={light ? colors.surface : colors.icon} name="camera" size={22} />
+    <View style={styles.cameraGlyph}>
+      <Image
+        contentFit="contain"
+        source={cameraIcon}
+        style={styles.cameraIcon}
+      />
     </View>
   );
 }
@@ -106,7 +117,7 @@ const styles = StyleSheet.create<{
   miniGlyphWrap: ViewStyle;
   miniGlyph: ViewStyle;
   cameraGlyph: ViewStyle;
-  cameraGlyphLight: ViewStyle;
+  cameraIcon: ImageStyle;
   levelBadge: ViewStyle;
   levelBadgeText: TextStyle;
   routePin: ViewStyle;
@@ -183,14 +194,16 @@ const styles = StyleSheet.create<{
   },
   cameraGlyph: {
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: "#FAFAFA",
     borderRadius: 26,
-    height: 51,
+    height: 52,
     justifyContent: "center",
-    width: 51,
+    width: 52,
+    ...shadows.soft,
   },
-  cameraGlyphLight: {
-    backgroundColor: colors.icon,
+  cameraIcon: {
+    height: 34,
+    width: 34,
   },
   levelBadge: {
     alignItems: "center",

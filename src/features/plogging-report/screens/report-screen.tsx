@@ -1,6 +1,7 @@
 import { colors, shadows } from "@/src/shared/theme";
 import {
   DecorativeLeafFace,
+  BackButton,
   LevelBadge,
   PrimaryBottomButton,
   ScreenRoot,
@@ -15,8 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
 
-import { reportMetrics, type ReportMetric } from "../data/report-data";
 import { RouteSnapshotMap } from "../components/route-snapshot-map";
+import { reportMetrics, type ReportMetric } from "../data/report-data";
 
 export function ReportScreen() {
   const router = useRouter();
@@ -54,18 +55,7 @@ function ReportHeader({ onBack }: { onBack: () => void }) {
   return (
     <>
       <View style={styles.headerActions}>
-        <Pressable
-          accessibilityLabel="뒤로가기"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={onBack}
-          style={({ pressed }) => [
-            styles.headerButton,
-            pressed ? styles.pressed : null,
-          ]}
-        >
-          <Text style={styles.backText}>{"<"}</Text>
-        </Pressable>
+        <BackButton onPress={onBack} />
         <Pressable
           accessibilityLabel="내보내기"
           accessibilityRole="button"
@@ -262,11 +252,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0,
-  },
-  backText: {
-    color: colors.text,
-    fontSize: 24,
-    lineHeight: 26,
   },
   cardCaption: {
     color: colors.subtle,

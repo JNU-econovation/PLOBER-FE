@@ -5,6 +5,7 @@ import {
   MapControls,
   ModeSwitch,
   ScreenRoot,
+  TAB_BAR_HEIGHT,
   type PloggingMode,
 } from "@/src/shared/ui";
 import { LinearGradient } from "expo-linear-gradient";
@@ -25,8 +26,8 @@ export function HomeScreen() {
   const handleStart = () => {
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
-  // 탭바 실제 높이(navigation.tsx의 PloggingTabBar와 동일 공식)
-  const tabBarHeight = 84 + insets.bottom;
+  // 피그마 기준 탭바 높이와 동일하게 유지한다.
+  const tabBarHeight = TAB_BAR_HEIGHT;
   // 시안 기준 탭바 위 간격을 그대로 유지(safe-area 기기에서도 동일한 시각 비율)
   const startButtonOffset = 41;
   const reportButtonOffset = 63;

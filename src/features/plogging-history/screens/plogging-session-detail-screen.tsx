@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, shadows } from "@/src/shared/theme";
-import { ScreenRoot, StatNumber } from "@/src/shared/ui";
+import { BackButton, ScreenRoot, StatNumber } from "@/src/shared/ui";
 
 import type { PloggingSessionDetail } from "../api/types";
 import { usePloggingSessionDetail } from "../hooks/use-plogging-session-detail";
@@ -63,18 +63,7 @@ export function PloggingSessionDetailScreen({
 function DetailHeader({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.headerActions}>
-      <Pressable
-        accessibilityLabel="뒤로가기"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onBack}
-        style={({ pressed }) => [
-          styles.headerButton,
-          pressed ? styles.pressed : null,
-        ]}
-      >
-        <Text style={styles.backText}>{"<"}</Text>
-      </Pressable>
+      <BackButton onPress={onBack} />
       <Pressable
         accessibilityLabel="내보내기"
         accessibilityRole="button"
@@ -242,11 +231,6 @@ function formatHmDuration(totalSeconds: number): string {
 }
 
 const styles = StyleSheet.create({
-  backText: {
-    color: colors.text,
-    fontSize: 24,
-    lineHeight: 26,
-  },
   cardCaption: {
     color: colors.subtle,
     fontSize: 14,
