@@ -2,11 +2,19 @@ import { Image } from "expo-image";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import type { ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconSource = ComponentProps<typeof Image>["source"];
 
 export const TAB_BAR_HEIGHT = 84;
 const TAB_ICON_SIZE = 36;
+
+// 하단 탭바의 실제 점유 높이. SafeArea 인셋(시스템 네비게이션 바)을 포함한다.
+// 홈 화면 등 탭바 위에 absolute로 위치를 잡는 곳에서 이 훅을 사용하면 자동으로 정합성이 유지된다.
+export function useTabBarHeight(): number {
+  const insets = useSafeAreaInsets();
+  return TAB_BAR_HEIGHT + insets.bottom;
+}
 
 const tabConfig: Record<
   string,
@@ -38,8 +46,16 @@ export function PloggingTabBar({
   navigation,
   state,
 }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View accessibilityRole="tablist" style={styles.bottomTabs}>
+    <View
+      accessibilityRole="tablist"
+      style={[
+        styles.bottomTabs,
+        { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom },
+      ]}
+    >
       <View style={styles.tabRow}>
         {state.routes.map((route, index) => {
           const selected = state.index === index;
@@ -99,7 +115,6 @@ const styles = StyleSheet.create({
   bottomTabs: {
     backgroundColor: "#FAFAFA",
     bottom: 0,
-    height: TAB_BAR_HEIGHT,
     left: 0,
     position: "absolute",
     right: 0,
