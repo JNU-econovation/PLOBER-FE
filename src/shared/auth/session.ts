@@ -12,6 +12,8 @@ export type AuthSession = {
   email: string;
 };
 
+type AuthSessionListener = (session: AuthSession | null) => void;
+
 type SecureStoreModule = {
   deleteValueWithKeyAsync: (key: string, options?: object) => Promise<void>;
   getValueWithKeyAsync: (key: string, options?: object) => Promise<string | null>;
@@ -24,6 +26,19 @@ type SecureStoreModule = {
 
 let secureStoreModule: SecureStoreModule | null | undefined;
 let memorySession: AuthSession | null = null;
+const authSessionListeners = new Set<AuthSessionListener>();
+
+function notifyAuthSessionChange(session: AuthSession | null): void {
+  authSessionListeners.forEach((listener) => listener(session));
+}
+
+export function subscribeAuthSession(listener: AuthSessionListener): () => void {
+  authSessionListeners.add(listener);
+
+  return () => {
+    authSessionListeners.delete(listener);
+  };
+}
 
 function getSecureStoreModule(): SecureStoreModule | null {
   if (Platform.OS === "web") return null;
@@ -114,6 +129,7 @@ export async function saveSession(session: AuthSession): Promise<void> {
   const secureStore = getSecureStoreModule();
   if (!(await isSecureStoreAvailable())) {
     writeFallbackSession(session);
+    notifyAuthSessionChange(session);
     return;
   }
 
@@ -122,12 +138,14 @@ export async function saveSession(session: AuthSession): Promise<void> {
     AUTH_SESSION_KEY,
     SECURE_STORE_OPTIONS
   );
+  notifyAuthSessionChange(session);
 }
 
 export async function clearSession(): Promise<void> {
   const secureStore = getSecureStoreModule();
   if (!(await isSecureStoreAvailable())) {
     clearFallbackSession();
+    notifyAuthSessionChange(null);
     return;
   }
 
@@ -135,4 +153,5 @@ export async function clearSession(): Promise<void> {
     AUTH_SESSION_KEY,
     SECURE_STORE_OPTIONS
   );
+  notifyAuthSessionChange(null);
 }

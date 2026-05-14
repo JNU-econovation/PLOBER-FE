@@ -44,6 +44,7 @@ import {
 
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 const DAYS_PER_WEEK = 7;
+const MAX_EXPERIENCE_PROGRESS = 100;
 
 declare const require: <T = unknown>(moduleName: string) => T;
 
@@ -147,6 +148,7 @@ export function ProfileScreen() {
     level: profile?.level ?? 1,
     title: profile?.title ?? "",
     profileImageUrl: profile?.profileImageUrl ?? null,
+    experience: profile?.experience ?? 0,
   };
 
   const openNicknameEditor = () => {
@@ -183,6 +185,7 @@ export function ProfileScreen() {
       });
 
       setProfile((currentProfile) => ({
+        experience: currentProfile?.experience ?? displayedProfile.experience,
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: updatedNickname.nickname,
         title: currentProfile?.title ?? displayedProfile.title,
@@ -290,6 +293,7 @@ export function ProfileScreen() {
         updatedProfileImage.profileImageUrl ?? uploadTarget.objectUrl;
 
       setProfile((currentProfile) => ({
+        experience: currentProfile?.experience ?? displayedProfile.experience,
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: currentProfile?.nickname ?? displayedProfile.nickname,
         title: currentProfile?.title ?? displayedProfile.title,
@@ -470,6 +474,11 @@ function ProfileOverview({
   profile: UserProfile;
   uploadingProfileImage: boolean;
 }) {
+  const experienceProgressPercent = getExperienceProgressPercent(
+    profile.experience
+  );
+  const experienceProgressWidth = `${experienceProgressPercent}%` as const;
+
   return (
     <View style={styles.profileOverview}>
       <ProfileAvatar
@@ -493,7 +502,9 @@ function ProfileOverview({
           {loading ? <ActivityIndicator color={colors.primary} size="small" /> : null}
         </View>
         <View style={styles.progressTrack}>
-          <View style={styles.progressFill} />
+          <View
+            style={[styles.progressFill, { width: experienceProgressWidth }]}
+          />
         </View>
       </View>
     </View>
@@ -565,6 +576,12 @@ function formatDistanceKilometers(distanceMeters: number) {
 function formatTenThousandSteps(stepCount: number) {
   const tenThousandSteps = stepCount / 10000;
   return formatCompactNumber(tenThousandSteps);
+}
+
+function getExperienceProgressPercent(experience: number) {
+  if (!Number.isFinite(experience)) return 0;
+
+  return Math.max(0, Math.min(experience, MAX_EXPERIENCE_PROGRESS));
 }
 
 function getSummaryStats(stats: MyPloggingStats | null): SummaryStat[] {

@@ -11,6 +11,7 @@ import {
 import {
   clearSession,
   getSession,
+  subscribeAuthSession,
   type AuthSession,
 } from "../services/session";
 import { completeKakaoLogin } from "../services/kakao-auth";
@@ -30,6 +31,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    const unsubscribe = subscribeAuthSession((nextSession) => {
+      if (mounted) setSession(nextSession);
+    });
 
     getSession()
       .then((storedSession) => {
@@ -41,6 +45,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      unsubscribe();
     };
   }, []);
 
