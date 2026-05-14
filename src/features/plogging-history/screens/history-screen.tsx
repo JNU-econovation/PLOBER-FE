@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { weeklyBars } from "../data/history-data";
 import { usePloggingSessions } from "../hooks/use-plogging-sessions";
@@ -18,6 +17,7 @@ import {
   ScreenRoot,
   StatNumber,
   TopInset,
+  useSafeBottomInset,
 } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
 
@@ -28,13 +28,13 @@ const MOCK_GLYPH_BACKGROUND = "#EFF7EF";
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 export function HistoryScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomInset = useSafeBottomInset();
 
   return (
     <ScreenRoot>
       <ScrollView
         contentContainerStyle={{
-          paddingBottom: Math.max(insets.bottom, 24) + 118,
+          paddingBottom: bottomInset + 118,
         }}
         showsVerticalScrollIndicator={false}
       >

@@ -14,10 +14,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { saveSession, useAuthSession } from "@/src/features/auth";
-import { ScreenRoot } from "@/src/shared/ui";
+import {
+  ScreenRoot,
+  useSafeBottomInset,
+  useSafeTopInset,
+} from "@/src/shared/ui";
 import { colors, shadows, typography } from "@/src/shared/theme";
 
 import {
@@ -70,7 +72,8 @@ function getImagePickerModule() {
 }
 
 export function ProfileScreen() {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
+  const bottomInset = useSafeBottomInset();
   const { session, status } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [ploggingStats, setPloggingStats] =
@@ -309,8 +312,8 @@ export function ProfileScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingBottom: Math.max(insets.bottom, 24) + 118,
-            paddingTop: Math.max(insets.top, 44) + 8,
+            paddingBottom: bottomInset + 118,
+            paddingTop: topInset + 8,
           },
         ]}
         showsVerticalScrollIndicator={false}

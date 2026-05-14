@@ -6,13 +6,13 @@ import {
   ModeSwitch,
   ScreenRoot,
   TAB_BAR_HEIGHT,
+  useSafeTopInset,
   type PloggingMode,
 } from "@/src/shared/ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
 
 // 시작 버튼 + 위/아래 같은 간격(41px)까지는 솔리드, 그 위로는 페이드
 const START_BUTTON_HEIGHT = 96;
@@ -20,7 +20,7 @@ const FADE_GRADIENT_HEIGHT = 80;
 
 export function HomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets(); // Safe Area 훅 추가
+  const topInset = useSafeTopInset();
   const [mode, setMode] = useState<PloggingMode>("ai");
 
   const handleStart = () => {
@@ -44,7 +44,7 @@ export function HomeScreen() {
       <PloggingMap dimmed>
         <ModeSwitch onChange={setMode} value={mode} />
         {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
-        <MapControls top={Math.max(insets.top, 44) + 80} />
+        <MapControls top={topInset + 80} />
 
         <LinearGradient
           colors={[
