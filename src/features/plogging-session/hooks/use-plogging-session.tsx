@@ -7,11 +7,15 @@ import {
   type ReactNode,
 } from "react";
 
-import type { RoutePoint } from "../api/types";
+import type { PloggingMode, RoutePoint } from "../api/types";
 import { caloriesFromSteps } from "../services/calculate-calories";
 
 type PloggingSessionContextValue = {
   // 누적 데이터
+  mode: PloggingMode;
+  startedAtMs: number | null;
+  finishedAtMs: number | null;
+  restSeconds: number;
   photoUris: string[];
   // 로컬 URI → S3 objectUrl 매핑. 업로드 성공한 사진만 키로 존재한다.
   photoObjectUrls: Record<string, string>;
@@ -26,6 +30,9 @@ type PloggingSessionContextValue = {
   mapImageObjectUrl: string | null;
 
   // 변경 액션
+  setMode: (mode: PloggingMode) => void;
+  startSession: () => void;
+  finishSession: (restSeconds: number) => void;
   addPhoto: (uri: string) => void;
   removePhoto: (uri: string) => void;
   addPhotoObjectUrl: (localUri: string, objectUrl: string) => void;
@@ -41,6 +48,10 @@ const PloggingSessionContext =
   createContext<PloggingSessionContextValue | null>(null);
 
 export function PloggingSessionProvider({ children }: { children: ReactNode }) {
+  const [mode, setModeState] = useState<PloggingMode>("FREE");
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
+  const [finishedAtMs, setFinishedAtMs] = useState<number | null>(null);
+  const [restSeconds, setRestSeconds] = useState(0);
   const [photoUris, setPhotoUris] = useState<string[]>([]);
   const [photoObjectUrls, setPhotoObjectUrls] = useState<
     Record<string, string>
@@ -114,6 +125,22 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     setMapImageObjectUrlState(url);
   }, []);
 
+  const setMode = useCallback((next: PloggingMode) => {
+    setModeState(next);
+  }, []);
+
+  // 세션 시작 시각 고정. 같은 세션 내 재호출은 무시한다.
+  const startSession = useCallback(() => {
+    setStartedAtMs((prev) => (prev !== null ? prev : Date.now()));
+    setFinishedAtMs(null);
+  }, []);
+
+  // 종료 시각과 누적 휴식 시간 확정.
+  const finishSession = useCallback((nextRestSeconds: number) => {
+    setFinishedAtMs(Date.now());
+    setRestSeconds(Math.max(0, Math.floor(nextRestSeconds)));
+  }, []);
+
   const resetSession = useCallback(() => {
     setPhotoUris([]);
     setPhotoObjectUrls({});
@@ -125,6 +152,9 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     setPlaceNameState("");
     setMapImageUriState(null);
     setMapImageObjectUrlState(null);
+    setStartedAtMs(null);
+    setFinishedAtMs(null);
+    setRestSeconds(0);
   }, []);
 
   const value = useMemo<PloggingSessionContextValue>(
@@ -136,18 +166,25 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       caloriesBurned: caloriesFromSteps(stepCount),
       distanceMeters,
       endCoord,
+      finishedAtMs,
+      finishSession,
       mapImageObjectUrl,
       mapImageUri,
+      mode,
       photoObjectUrls,
       photoUris,
       placeName,
       removePhoto,
       resetSession,
+      restSeconds,
       routePoints,
       setMapImageObjectUrl,
       setMapImageUri,
+      setMode,
       setPlaceName,
       startCoord,
+      startedAtMs,
+      startSession,
       stepCount,
     }),
     [
@@ -157,18 +194,25 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       appendRoutePoint,
       distanceMeters,
       endCoord,
+      finishedAtMs,
+      finishSession,
       mapImageObjectUrl,
       mapImageUri,
+      mode,
       photoObjectUrls,
       photoUris,
       placeName,
       removePhoto,
       resetSession,
+      restSeconds,
       routePoints,
       setMapImageObjectUrl,
       setMapImageUri,
+      setMode,
       setPlaceName,
       startCoord,
+      startedAtMs,
+      startSession,
       stepCount,
     ]
   );
