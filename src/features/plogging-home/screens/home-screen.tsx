@@ -5,7 +5,7 @@ import {
   MapControls,
   ModeSwitch,
   ScreenRoot,
-  TAB_BAR_HEIGHT,
+  useTabBarHeight,
   type PloggingMode,
 } from "@/src/shared/ui";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,8 +26,8 @@ export function HomeScreen() {
   const handleStart = () => {
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
-  // 피그마 기준 탭바 높이와 동일하게 유지한다.
-  const tabBarHeight = TAB_BAR_HEIGHT;
+  // Android에서는 시스템 내비게이션 바 inset을 더해 겹침을 방지한다.
+  const tabBarHeight = useTabBarHeight();
   // 시안 기준 탭바 위 간격을 그대로 유지(safe-area 기기에서도 동일한 시각 비율)
   const startButtonOffset = 41;
   const reportButtonOffset = 63;

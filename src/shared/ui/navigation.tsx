@@ -1,12 +1,19 @@
 import { Image } from "expo-image";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import type { ComponentProps } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconSource = ComponentProps<typeof Image>["source"];
 
 export const TAB_BAR_HEIGHT = 84;
 const TAB_ICON_SIZE = 36;
+
+export function useTabBarHeight() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Platform.OS === "android" ? insets.bottom : 0;
+  return TAB_BAR_HEIGHT + bottomInset;
+}
 
 const tabConfig: Record<
   string,
@@ -38,8 +45,22 @@ export function PloggingTabBar({
   navigation,
   state,
 }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Platform.OS === "android" ? insets.bottom : 0;
+
   return (
-    <View accessibilityRole="tablist" style={styles.bottomTabs}>
+    <View
+      accessibilityRole="tablist"
+      style={[
+        styles.bottomTabs,
+        bottomInset > 0
+          ? {
+              height: TAB_BAR_HEIGHT + bottomInset,
+              paddingBottom: bottomInset,
+            }
+          : null,
+      ]}
+    >
       <View style={styles.tabRow}>
         {state.routes.map((route, index) => {
           const selected = state.index === index;
