@@ -34,8 +34,6 @@ export function AiRouteScreen() {
 
   return (
     <ScreenRoot>
-      {/* AI 추천 경로 화면은 추천 경로를 보여주는 것이 목적이므로 사용자 위치 추적을 끈다.
-          (Follow 모드가 GPS fix 미확보 시 SDK 디폴트(서울)로 카메라를 옮기는 현상 회피) */}
       <PloggingMap dimmed followUserLocation={false} routeVisible zoom={15.1}>
         <RouteHeader onClose={() => router.back()} />
         <View style={styles.routeSketch}>

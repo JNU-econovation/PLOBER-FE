@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { saveSession, useAuthSession } from "@/src/features/auth";
+import { colors, shadows, typography } from "@/src/shared/theme";
+import { ScreenRoot } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
-import { requireOptionalNativeModule } from "expo-modules-core";
 import type * as ExpoImagePicker from "expo-image-picker";
+import { requireOptionalNativeModule } from "expo-modules-core";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -14,13 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { saveSession, useAuthSession } from "@/src/features/auth";
-import {
-  ScreenRoot,
-  useSafeBottomInset,
-  useSafeTopInset,
-} from "@/src/shared/ui";
-import { colors, shadows, typography } from "@/src/shared/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   getMyPloggingStats,
@@ -32,10 +29,10 @@ import {
   type UserProfile,
 } from "../api";
 import {
-  type CalendarMonth,
   DEFAULT_PROFILE_CALENDAR,
   monthlyActivityDays,
   profileSummaryStats,
+  type CalendarMonth,
 } from "../data/profile-data";
 import {
   resolveProfileImageContentType,
@@ -316,8 +313,8 @@ export function ProfileScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingBottom: bottomInset + 118,
-            paddingTop: topInset + 8,
+            paddingBottom: Math.max(insets.bottom, 24) + 118,
+            paddingTop: 8,
           },
         ]}
         showsVerticalScrollIndicator={false}
