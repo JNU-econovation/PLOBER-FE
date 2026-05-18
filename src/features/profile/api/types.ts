@@ -3,6 +3,7 @@ export type UserProfile = {
   level: number;
   title: string;
   profileImageUrl: string | null;
+  experience: number;
 };
 
 export type GetMyPloggingStatsRequest = {

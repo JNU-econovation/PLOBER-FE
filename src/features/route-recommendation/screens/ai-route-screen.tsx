@@ -32,7 +32,7 @@ export function AiRouteScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed routeVisible zoom={15.1}>
+      <PloggingMap dimmed followUserLocation={false} routeVisible zoom={15.1}>
         <RouteHeader onClose={() => router.back()} />
         <View style={styles.routeSketch}>
           <RouteSketch />

@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { saveSession, useAuthSession } from "@/src/features/auth";
+import { colors, shadows, typography } from "@/src/shared/theme";
+import { ScreenRoot } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
-import { requireOptionalNativeModule } from "expo-modules-core";
 import type * as ExpoImagePicker from "expo-image-picker";
+import { requireOptionalNativeModule } from "expo-modules-core";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -16,10 +19,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { saveSession, useAuthSession } from "@/src/features/auth";
-import { ScreenRoot } from "@/src/shared/ui";
-import { colors, shadows, typography } from "@/src/shared/theme";
-
 import {
   getMyPloggingStats,
   getProfileImageUploadUrl,
@@ -30,10 +29,10 @@ import {
   type UserProfile,
 } from "../api";
 import {
-  type CalendarMonth,
   DEFAULT_PROFILE_CALENDAR,
   monthlyActivityDays,
   profileSummaryStats,
+  type CalendarMonth,
 } from "../data/profile-data";
 import {
   resolveProfileImageContentType,
@@ -42,6 +41,7 @@ import {
 
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 const DAYS_PER_WEEK = 7;
+const MAX_EXPERIENCE_PROGRESS = 100;
 
 declare const require: <T = unknown>(moduleName: string) => T;
 
@@ -144,6 +144,7 @@ export function ProfileScreen() {
     level: profile?.level ?? 1,
     title: profile?.title ?? "",
     profileImageUrl: profile?.profileImageUrl ?? null,
+    experience: profile?.experience ?? 0,
   };
 
   const openNicknameEditor = () => {
@@ -180,6 +181,7 @@ export function ProfileScreen() {
       });
 
       setProfile((currentProfile) => ({
+        experience: currentProfile?.experience ?? displayedProfile.experience,
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: updatedNickname.nickname,
         title: currentProfile?.title ?? displayedProfile.title,
@@ -287,6 +289,7 @@ export function ProfileScreen() {
         updatedProfileImage.profileImageUrl ?? uploadTarget.objectUrl;
 
       setProfile((currentProfile) => ({
+        experience: currentProfile?.experience ?? displayedProfile.experience,
         level: currentProfile?.level ?? displayedProfile.level,
         nickname: currentProfile?.nickname ?? displayedProfile.nickname,
         title: currentProfile?.title ?? displayedProfile.title,
@@ -310,7 +313,7 @@ export function ProfileScreen() {
           styles.content,
           {
             paddingBottom: Math.max(insets.bottom, 24) + 118,
-            paddingTop: Math.max(insets.top, 44) + 8,
+            paddingTop: 8,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -467,6 +470,11 @@ function ProfileOverview({
   profile: UserProfile;
   uploadingProfileImage: boolean;
 }) {
+  const experienceProgressPercent = getExperienceProgressPercent(
+    profile.experience
+  );
+  const experienceProgressWidth = `${experienceProgressPercent}%` as const;
+
   return (
     <View style={styles.profileOverview}>
       <ProfileAvatar
@@ -490,7 +498,9 @@ function ProfileOverview({
           {loading ? <ActivityIndicator color={colors.primary} size="small" /> : null}
         </View>
         <View style={styles.progressTrack}>
-          <View style={styles.progressFill} />
+          <View
+            style={[styles.progressFill, { width: experienceProgressWidth }]}
+          />
         </View>
       </View>
     </View>
@@ -562,6 +572,12 @@ function formatDistanceKilometers(distanceMeters: number) {
 function formatTenThousandSteps(stepCount: number) {
   const tenThousandSteps = stepCount / 10000;
   return formatCompactNumber(tenThousandSteps);
+}
+
+function getExperienceProgressPercent(experience: number) {
+  if (!Number.isFinite(experience)) return 0;
+
+  return Math.max(0, Math.min(experience, MAX_EXPERIENCE_PROGRESS));
 }
 
 function getSummaryStats(stats: MyPloggingStats | null): SummaryStat[] {
