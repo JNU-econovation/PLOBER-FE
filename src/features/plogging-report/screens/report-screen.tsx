@@ -6,13 +6,12 @@ import {
   PrimaryBottomButton,
   ScreenRoot,
   StatNumber,
-  useSafeBottomInset,
-  useSafeTopInset,
 } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
@@ -22,18 +21,17 @@ import { reportMetrics, type ReportMetric } from "../data/report-data";
 
 export function ReportScreen() {
   const router = useRouter();
-  const topInset = useSafeTopInset();
-  const bottomInset = useSafeBottomInset(30);
+  const insets = useSafeAreaInsets();
 
   return (
     <ScreenRoot>
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {
-            paddingTop: topInset + 16,
-            // 하단 PrimaryButton 높이 + SafeArea만큼 스크롤 여백 확보
-            paddingBottom: bottomInset + 120
+          { 
+            paddingTop: Math.max(insets.top, 44) + 16,
+            // 🌟 하단 PrimaryButton 높이 + Safe Area만큼 스크롤 여백 동적 확보
+            paddingBottom: Math.max(insets.bottom, 30) + 120 
           },
         ]}
         showsVerticalScrollIndicator={false}

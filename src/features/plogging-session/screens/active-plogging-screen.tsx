@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
 import { PloggingMap } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -10,8 +11,6 @@ import {
   PlayGlyph,
   ScreenRoot,
   StatNumber,
-  useSafeBottomInset,
-  useSafeTopInset,
 } from "@/src/shared/ui";
 
 import { usePloggingSession } from "../hooks/use-plogging-session";
@@ -24,8 +23,7 @@ type LiveStat = { label: string; unit: string; value: string };
 
 export function ActivePloggingScreen() {
   const router = useRouter();
-  const topInset = useSafeTopInset();
-  const bottomInset = useSafeBottomInset();
+  const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
   const timer = usePloggingTimer();
   const {
     addPhoto,
@@ -74,15 +72,17 @@ export function ActivePloggingScreen() {
   return (
     <ScreenRoot>
       <PloggingMap dimmed zoom={17}>
+        {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
         <PloggingTimerCard
           formattedElapsed={timer.formatted}
           stats={liveStats}
-          top={topInset + 16}
+          top={Math.max(insets.top, 44) + 16}
         />
-        {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치 */}
-        <MapControls top={topInset + 184} />
+        {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
+        <MapControls top={Math.max(insets.top, 44) + 184} />
+        {/* 하단 제스처 바 영역을 고려하여 bottom 위치 동적 할당 */}
         <ActionDock
-          bottom={bottomInset + 24}
+          bottom={Math.max(insets.bottom, 24) + 24}
           isPaused={timer.isPaused}
           onCapturePhoto={handleCapturePhoto}
           onEnd={() => router.push("/report")}

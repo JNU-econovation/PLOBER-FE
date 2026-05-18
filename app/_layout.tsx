@@ -1,27 +1,22 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
 import { Redirect, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthSessionProvider, useAuthSession } from "@/src/features/auth";
 import { PloggingSessionProvider } from "@/src/features/plogging-session/hooks/use-plogging-session";
-import { ensureForegroundLocationPermission } from "@/src/shared/location/permissions";
 import { colors } from "@/src/shared/theme";
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AuthSessionProvider>
-        <PloggingSessionProvider>
-          <StatusBar style="dark" />
-          <AuthGate>
-            <RootStack />
-          </AuthGate>
-        </PloggingSessionProvider>
-      </AuthSessionProvider>
-    </SafeAreaProvider>
+    <AuthSessionProvider>
+      <PloggingSessionProvider>
+        <StatusBar style="dark" />
+        <AuthGate>
+          <RootStack />
+        </AuthGate>
+      </PloggingSessionProvider>
+    </AuthSessionProvider>
   );
 }
 
@@ -67,20 +62,7 @@ function AuthGate({ children }: { children: ReactNode }) {
     return <Redirect href="/" />;
   }
 
-  return (
-    <>
-      <LocationPermissionBootstrap />
-      {children}
-    </>
-  );
-}
-
-function LocationPermissionBootstrap() {
-  useEffect(() => {
-    void ensureForegroundLocationPermission();
-  }, []);
-
-  return null;
+  return children;
 }
 
 const styles = StyleSheet.create({

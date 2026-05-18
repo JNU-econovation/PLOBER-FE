@@ -3,8 +3,6 @@ import { Alert, Linking } from "react-native";
 import * as Location from "expo-location";
 import { Pedometer } from "expo-sensors";
 
-import { ensureForegroundLocationPermission } from "@/src/shared/location/permissions";
-
 import { usePloggingSession } from "./use-plogging-session";
 
 type PermissionStatus = "idle" | "granted" | "denied" | "unavailable";
@@ -47,11 +45,26 @@ export function usePloggingTracker({
 
     (async () => {
       try {
-        const hasPermission = await ensureForegroundLocationPermission();
+        const current = await Location.getForegroundPermissionsAsync();
+        let status = current.status;
+        let canAskAgain = current.canAskAgain;
+
+        if (status !== "granted" && canAskAgain) {
+          const requested = await Location.requestForegroundPermissionsAsync();
+          status = requested.status;
+          canAskAgain = requested.canAskAgain;
+        }
+
         if (cancelled) return;
 
-        if (!hasPermission) {
+        if (status !== "granted") {
           setLocationPermission("denied");
+          if (!canAskAgain) {
+            showSettingsAlert(
+              "위치 권한이 필요합니다",
+              "플로깅 경로를 기록하려면 설정에서 위치 권한을 허용해주세요."
+            );
+          }
           return;
         }
 

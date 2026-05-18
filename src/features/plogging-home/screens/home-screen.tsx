@@ -5,14 +5,14 @@ import {
   MapControls,
   ModeSwitch,
   ScreenRoot,
-  useSafeTopInset,
-  useTabBarHeight,
+  TAB_BAR_HEIGHT,
   type PloggingMode,
 } from "@/src/shared/ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
 
 // 시작 버튼 + 위/아래 같은 간격(41px)까지는 솔리드, 그 위로는 페이드
 const START_BUTTON_HEIGHT = 96;
@@ -20,13 +20,14 @@ const FADE_GRADIENT_HEIGHT = 80;
 
 export function HomeScreen() {
   const router = useRouter();
-  const topInset = useSafeTopInset();
-  const tabBarHeight = useTabBarHeight();
+  const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   const [mode, setMode] = useState<PloggingMode>("ai");
 
   const handleStart = () => {
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
+  // 피그마 기준 탭바 높이와 동일하게 유지한다.
+  const tabBarHeight = TAB_BAR_HEIGHT;
   // 시안 기준 탭바 위 간격을 그대로 유지(safe-area 기기에서도 동일한 시각 비율)
   const startButtonOffset = 41;
   const reportButtonOffset = 63;
@@ -43,7 +44,7 @@ export function HomeScreen() {
       <PloggingMap dimmed>
         <ModeSwitch onChange={setMode} value={mode} />
         {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
-        <MapControls top={topInset + 80} />
+        <MapControls top={Math.max(insets.top, 44) + 80} />
 
         <LinearGradient
           colors={[

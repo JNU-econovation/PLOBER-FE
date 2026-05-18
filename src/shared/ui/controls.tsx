@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, shadows } from "../theme";
-import { useSafeTopInset } from "./layout";
 
 type FeatherName = ComponentProps<typeof Feather>["name"];
 type MapControlIconSource = ComponentProps<typeof Image>["source"];
@@ -170,13 +169,14 @@ export function ModeSwitch({
   value: PloggingMode;
   onChange: (value: PloggingMode) => void;
 }) {
-  const topInset = useSafeTopInset();
+  const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   return (
-    <View
-      accessibilityRole="tablist"
+    <View 
+      accessibilityRole="tablist" 
       style={[
         styles.modeSwitch,
-        { top: topInset + 16 }
+        // 기기별 상단 노치 영역을 계산하여 top 위치 동적 설정
+        { top: Math.max(insets.top, 44) + 16 } 
       ]}
     >
       <ModeOption

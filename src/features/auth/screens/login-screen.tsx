@@ -6,19 +6,15 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  ScreenRoot,
-  useSafeBottomInset,
-  useSafeTopInset,
-} from "@/src/shared/ui";
+import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
 
 import { buildKakaoAuthorizeUrl } from "../services/kakao-auth";
 
 export function LoginScreen() {
-  const topInset = useSafeTopInset();
-  const bottomInset = useSafeBottomInset();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const handleLogin = () => {
@@ -36,8 +32,8 @@ export function LoginScreen() {
         style={[
           styles.content,
           {
-            paddingBottom: bottomInset + 24,
-            paddingTop: topInset + 48,
+            paddingBottom: Math.max(insets.bottom, 24) + 24,
+            paddingTop: Math.max(insets.top, 44) + 48,
           },
         ]}
       >
