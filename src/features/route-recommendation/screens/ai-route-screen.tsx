@@ -8,7 +8,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PloggingMap, RouteSketch } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
@@ -17,6 +16,8 @@ import {
   PrimaryBottomButton,
   ScreenRoot,
   TopInset,
+  useSafeBottomInset,
+  useSafeTopInset,
 } from "@/src/shared/ui";
 
 import { routeOptions, type RouteOptionId } from "../data/route-options";
@@ -25,7 +26,8 @@ type RouteOption = (typeof routeOptions)[number];
 
 export function AiRouteScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
+  const topInset = useSafeTopInset();
+  const bottomInset = useSafeBottomInset(30);
   const [selectedRouteId, setSelectedRouteId] = useState<RouteOptionId>(
     routeOptions[0].id,
   );
@@ -37,16 +39,16 @@ export function AiRouteScreen() {
         <View style={styles.routeSketch}>
           <RouteSketch />
         </View>
-        <MapControls top={Math.max(insets.top, 44) + 100} />
-        
+        <MapControls top={topInset + 100} />
+
         <ScrollView
           contentContainerStyle={styles.routeCardsContent}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={[
-            styles.routeCards, 
-            // 🌟 하단 PrimaryButton 높이를 고려하여 동적 여백 설정
-            { bottom: Math.max(insets.bottom, 30) + 110 } 
+            styles.routeCards,
+            // 하단 PrimaryButton 높이를 고려해 카드 위치 보정
+            { bottom: bottomInset + 110 }
           ]}
         >
           {routeOptions.map((option) => {

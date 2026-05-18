@@ -70,7 +70,8 @@ function getImagePickerModule() {
 }
 
 export function ProfileScreen() {
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
+  const bottomInset = useSafeBottomInset();
   const { session, status } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [ploggingStats, setPloggingStats] =

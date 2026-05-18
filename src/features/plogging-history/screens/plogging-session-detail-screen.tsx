@@ -9,10 +9,15 @@ import {
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, shadows } from "@/src/shared/theme";
-import { BackButton, ScreenRoot, StatNumber } from "@/src/shared/ui";
+import {
+  BackButton,
+  ScreenRoot,
+  StatNumber,
+  useSafeBottomInset,
+  useSafeTopInset,
+} from "@/src/shared/ui";
 
 import type { PloggingSessionDetail } from "../api/types";
 import { usePloggingSessionDetail } from "../hooks/use-plogging-session-detail";
@@ -25,7 +30,8 @@ export function PloggingSessionDetailScreen({
   ploggingSessionId: number | null;
 }) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const topInset = useSafeTopInset();
+  const bottomInset = useSafeBottomInset();
   const state = usePloggingSessionDetail(ploggingSessionId);
 
   return (
@@ -34,8 +40,8 @@ export function PloggingSessionDetailScreen({
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top, 44) + 16,
-            paddingBottom: Math.max(insets.bottom, 24) + 32,
+            paddingTop: topInset + 16,
+            paddingBottom: bottomInset + 32,
           },
         ]}
         showsVerticalScrollIndicator={false}
