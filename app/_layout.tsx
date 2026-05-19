@@ -5,16 +5,19 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AuthSessionProvider, useAuthSession } from "@/src/features/auth";
 import { PloggingSessionProvider } from "@/src/features/plogging-session/hooks/use-plogging-session";
+import { DeviceLocationProvider } from "@/src/shared/location";
 import { colors } from "@/src/shared/theme";
 
 export default function RootLayout() {
   return (
     <AuthSessionProvider>
       <PloggingSessionProvider>
-        <StatusBar style="dark" />
-        <AuthGate>
-          <RootStack />
-        </AuthGate>
+        <DeviceLocationProvider>
+          <StatusBar style="dark" />
+          <AuthGate>
+            <RootStack />
+          </AuthGate>
+        </DeviceLocationProvider>
       </PloggingSessionProvider>
     </AuthSessionProvider>
   );

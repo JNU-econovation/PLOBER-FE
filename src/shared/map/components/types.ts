@@ -1,6 +1,13 @@
 import type { PropsWithChildren } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 
+export type TrashBinMarker = {
+  id: number;
+  latitude: number;
+  longitude: number;
+  tintColor?: string;
+};
+
 export type PloggingMapProps = PropsWithChildren<{
   routeVisible?: boolean;
   dimmed?: boolean;
@@ -15,4 +22,8 @@ export type PloggingMapProps = PropsWithChildren<{
    * overlay and the camera follows it. Mock maps ignore this prop.
    */
   followUserLocation?: boolean;
+  /**
+   * Trash bin markers to render on the map. Mock maps ignore this prop.
+   */
+  trashBins?: TrashBinMarker[];
 }>;
