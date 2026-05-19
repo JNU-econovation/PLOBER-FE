@@ -16,7 +16,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
 
 import { usePloggingSession } from "@/src/features/plogging-session";
 import {
+  getToiletTintColor,
   getTrashBinTintColor,
+  useNearbyToilets,
   useNearbyTrashBins,
 } from "@/src/features/public-facilities";
 
@@ -28,8 +30,10 @@ export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   const [mode, setMode] = useState<PloggingMode>("ai");
+  const [restroomVisible, setRestroomVisible] = useState(false);
   const { setMode: setSessionMode } = usePloggingSession();
   const trashBinsState = useNearbyTrashBins();
+  const toiletsState = useNearbyToilets({ enabled: restroomVisible });
   const trashBinMarkers =
     trashBinsState.status === "success"
       ? trashBinsState.trashBins.map((bin) => ({
@@ -37,6 +41,15 @@ export function HomeScreen() {
           latitude: bin.latitude,
           longitude: bin.longitude,
           tintColor: getTrashBinTintColor(bin.trashType),
+        }))
+      : undefined;
+  const toiletMarkers =
+    restroomVisible && toiletsState.status === "success"
+      ? toiletsState.toilets.map((toilet) => ({
+          id: toilet.id,
+          latitude: toilet.latitude,
+          longitude: toilet.longitude,
+          tintColor: getToiletTintColor(toilet.openTimeType),
         }))
       : undefined;
 
@@ -63,10 +76,14 @@ export function HomeScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed trashBins={trashBinMarkers}>
+      <PloggingMap dimmed toilets={toiletMarkers} trashBins={trashBinMarkers}>
         <ModeSwitch onChange={setMode} value={mode} />
         {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
-        <MapControls top={Math.max(insets.top, 44) + 80} />
+        <MapControls
+          onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
+          restroomActive={restroomVisible}
+          top={Math.max(insets.top, 44) + 80}
+        />
 
         <LinearGradient
           colors={[

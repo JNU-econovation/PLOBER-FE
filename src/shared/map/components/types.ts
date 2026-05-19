@@ -8,6 +8,13 @@ export type TrashBinMarker = {
   tintColor?: string;
 };
 
+export type ToiletMarker = {
+  id: number;
+  latitude: number;
+  longitude: number;
+  tintColor?: string;
+};
+
 export type PloggingMapProps = PropsWithChildren<{
   routeVisible?: boolean;
   dimmed?: boolean;
@@ -26,4 +33,8 @@ export type PloggingMapProps = PropsWithChildren<{
    * Trash bin markers to render on the map. Mock maps ignore this prop.
    */
   trashBins?: TrashBinMarker[];
+  /**
+   * Toilet markers to render on the map. Mock maps ignore this prop.
+   */
+  toilets?: ToiletMarker[];
 }>;
