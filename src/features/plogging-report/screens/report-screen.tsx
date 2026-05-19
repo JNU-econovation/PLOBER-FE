@@ -1,7 +1,7 @@
 import { colors, shadows } from "@/src/shared/theme";
 import {
-  DecorativeLeafFace,
   BackButton,
+  DecorativeLeafFace,
   LevelBadge,
   PrimaryBottomButton,
   ScreenRoot,
@@ -9,19 +9,171 @@ import {
 } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { completePloggingSession } from "@/src/features/plogging-session/api/complete-plogging-session";
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
 
 import { RouteSnapshotMap } from "../components/route-snapshot-map";
-import { reportMetrics, type ReportMetric } from "../data/report-data";
+import type { ReportMetric } from "../data/report-data";
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function formatDateKo(ms: number | null): string {
+  if (ms === null) return "";
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function formatHm(ms: number | null): string {
+  if (ms === null) return "";
+  const d = new Date(ms);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function formatKilometers(meters: number): string {
+  return (meters / 1000).toFixed(1);
+}
+
+function formatInteger(value: number): string {
+  return Math.round(value).toLocaleString("ko-KR");
+}
+
+function formatHmDuration(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  return `${hours}:${pad2(minutes)}`;
+}
 
 export function ReportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const {
+    caloriesBurned,
+    distanceMeters,
+    endCoord,
+    finishedAtMs,
+    mapImageObjectUrl,
+    mapImageUri,
+    mode,
+    photoObjectUrls,
+    photoUris,
+    placeName,
+    resetSession,
+    restSeconds,
+    routePoints,
+    startCoord,
+    startedAtMs,
+    stepCount,
+  } = usePloggingSession();
+  const [submitting, setSubmitting] = useState(false);
+  const submittedRef = useRef(false);
+
+  // 지도 이미지 업로드가 진행 중일 수 있으니, "캡처는 됐는데 objectUrl이 아직 없는" 상태인지 본다.
+  const mapImageUploading = mapImageUri !== null && mapImageObjectUrl === null;
+
+  // 화면 표시용 값들. 컨텍스트에 값이 없으면 빈 문자열/0으로 떨어진다.
+  const dateLabel = formatDateKo(startedAtMs);
+  const timeRangeLabel =
+    startedAtMs !== null && finishedAtMs !== null
+      ? `${formatHm(startedAtMs)} → ${formatHm(finishedAtMs)}`
+      : "";
+  const modeLabel = mode === "AI" ? "AI 추천 · 완료" : "자유모드 · 완료";
+  const distanceKm = formatKilometers(distanceMeters);
+  const ploggingSecondsForView =
+    startedAtMs !== null && finishedAtMs !== null
+      ? Math.max(0, Math.floor((finishedAtMs - startedAtMs) / 1000) - restSeconds)
+      : 0;
+  const metrics: ReportMetric[] = [
+    { label: "걸음 수", unit: "steps", value: formatInteger(stepCount) },
+    { label: "플로깅 시간", unit: "H:M", value: formatHmDuration(ploggingSecondsForView) },
+    { label: "소모 칼로리", unit: "kcal", value: formatInteger(caloriesBurned) },
+    { label: "휴식", unit: "H:M", value: formatHmDuration(restSeconds) },
+  ];
+
+  const handleComplete = useCallback(async () => {
+    if (submittedRef.current || submitting) return;
+
+    if (startedAtMs === null) {
+      Alert.alert("저장 실패", "플로깅 시작 정보가 없습니다.");
+      return;
+    }
+    if (mapImageUploading) {
+      Alert.alert("잠시만요", "지도 이미지를 업로드하고 있어요. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    const finishedAt = finishedAtMs ?? Date.now();
+    const ploggingSeconds = Math.max(
+      0,
+      Math.floor((finishedAt - startedAtMs) / 1000) - restSeconds
+    );
+    // 업로드 성공한 사진만 백엔드로 보낸다(로컬 URI는 서버가 접근 불가).
+    const photoUrls = photoUris
+      .map((uri) => photoObjectUrls[uri])
+      .filter((url): url is string => Boolean(url));
+
+    const payload = {
+      mode,
+      startedAt: new Date(startedAtMs).toISOString(),
+      finishedAt: new Date(finishedAt).toISOString(),
+      distanceMeters: Math.round(distanceMeters),
+      stepCount,
+      caloriesBurned: Math.round(caloriesBurned),
+      ploggingSeconds,
+      restSeconds,
+      placeName: placeName || "",
+      startLatitude: startCoord?.latitude ?? 0,
+      startLongitude: startCoord?.longitude ?? 0,
+      endLatitude: endCoord?.latitude ?? 0,
+      endLongitude: endCoord?.longitude ?? 0,
+      routePoints,
+      mapImageUrl: mapImageObjectUrl ?? "",
+      photoUrls,
+    };
+
+    submittedRef.current = true;
+    setSubmitting(true);
+    try {
+      await completePloggingSession(payload);
+      resetSession();
+      router.replace("/history");
+    } catch (error) {
+      submittedRef.current = false;
+      const message =
+        error instanceof Error
+          ? error.message
+          : "플로깅 기록 저장에 실패했습니다.";
+      Alert.alert("저장 실패", message);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    caloriesBurned,
+    distanceMeters,
+    endCoord,
+    finishedAtMs,
+    mapImageObjectUrl,
+    mapImageUploading,
+    mode,
+    photoObjectUrls,
+    photoUris,
+    placeName,
+    resetSession,
+    restSeconds,
+    routePoints,
+    router,
+    startCoord,
+    startedAtMs,
+    stepCount,
+    submitting,
+  ]);
 
   return (
     <ScreenRoot>
@@ -36,22 +188,32 @@ export function ReportScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <ReportHeader onBack={() => router.back()} />
-        <ReportTitleBlock />
-        <DistanceSummaryCard />
-        <ReportMetricsCard />
+        <ReportHeader modeLabel={modeLabel} onBack={() => router.back()} />
+        <ReportTitleBlock
+          dateLabel={dateLabel}
+          placeName={placeName}
+          timeRangeLabel={timeRangeLabel}
+        />
+        <DistanceSummaryCard distanceKm={distanceKm} />
+        <ReportMetricsCard metrics={metrics} />
         <LevelProgressCard />
         <MemoCard />
       </ScrollView>
       <PrimaryBottomButton
-        onPress={() => router.replace("/history")}
-        title="플로깅 완료"
+        onPress={handleComplete}
+        title={submitting ? "저장 중..." : "플로깅 완료"}
       />
     </ScreenRoot>
   );
 }
 
-function ReportHeader({ onBack }: { onBack: () => void }) {
+function ReportHeader({
+  modeLabel,
+  onBack,
+}: {
+  modeLabel: string;
+  onBack: () => void;
+}) {
   return (
     <>
       <View style={styles.headerActions}>
@@ -70,28 +232,41 @@ function ReportHeader({ onBack }: { onBack: () => void }) {
       </View>
       <View style={styles.statusPill}>
         <Text selectable style={styles.statusText}>
-          자유모드 · 완료
+          {modeLabel}
         </Text>
       </View>
     </>
   );
 }
 
-function ReportTitleBlock() {
+function ReportTitleBlock({
+  dateLabel,
+  placeName,
+  timeRangeLabel,
+}: {
+  dateLabel: string;
+  placeName: string;
+  timeRangeLabel: string;
+}) {
   return (
     <>
       <Text selectable style={styles.reportTitle}>
-        <Text style={styles.reportTitleBold}>4월 24일</Text> 플로깅
+        <Text style={styles.reportTitleBold}>{dateLabel}</Text> 플로깅
       </Text>
       <Text selectable style={styles.reportSubTitle}>
-        18:21 → 20:02 ·{" "}
-        <Text style={styles.reportSubTitleBold}>용봉동 일대</Text>
+        {timeRangeLabel}
+        {placeName ? (
+          <>
+            {" · "}
+            <Text style={styles.reportSubTitleBold}>{placeName}</Text>
+          </>
+        ) : null}
       </Text>
     </>
   );
 }
 
-function DistanceSummaryCard() {
+function DistanceSummaryCard({ distanceKm }: { distanceKm: string }) {
   const {
     mapImageObjectUrl,
     mapImageUri,
@@ -134,7 +309,7 @@ function DistanceSummaryCard() {
         DISTANCE
       </Text>
       <View style={styles.distanceHeader}>
-        <StatNumber size={36} unit="km" value="8.2" />
+        <StatNumber size={36} unit="km" value={distanceKm} />
         <View style={styles.avgPill}>
           <Text selectable style={styles.avgText}>
             주간 평균 0.4km▲
@@ -165,10 +340,10 @@ function DistanceSummaryCard() {
   );
 }
 
-function ReportMetricsCard() {
+function ReportMetricsCard({ metrics }: { metrics: ReportMetric[] }) {
   return (
     <View style={styles.metricsCard}>
-      {reportMetrics.map((metric) => (
+      {metrics.map((metric) => (
         <MetricCell key={metric.label} metric={metric} />
       ))}
     </View>

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { usePloggingSession } from "@/src/features/plogging-session";
 import { PloggingMap, RouteSketch } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -26,6 +27,7 @@ type RouteOption = (typeof routeOptions)[number];
 export function AiRouteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
+  const { setMode: setSessionMode } = usePloggingSession();
   const [selectedRouteId, setSelectedRouteId] = useState<RouteOptionId>(
     routeOptions[0].id,
   );
@@ -64,6 +66,7 @@ export function AiRouteScreen() {
         </ScrollView>
         <PrimaryBottomButton
           onPress={() => {
+            setSessionMode("AI");
             router.push({
               pathname: "/plogging",
               params: { routeId: selectedRouteId },

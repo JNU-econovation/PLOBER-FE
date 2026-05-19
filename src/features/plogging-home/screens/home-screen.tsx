@@ -14,6 +14,8 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
 
+import { usePloggingSession } from "@/src/features/plogging-session";
+
 // 시작 버튼 + 위/아래 같은 간격(41px)까지는 솔리드, 그 위로는 페이드
 const START_BUTTON_HEIGHT = 96;
 const FADE_GRADIENT_HEIGHT = 80;
@@ -22,8 +24,14 @@ export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   const [mode, setMode] = useState<PloggingMode>("ai");
+  const { setMode: setSessionMode } = usePloggingSession();
 
   const handleStart = () => {
+    // 자유모드는 바로 플로깅 시작하므로 여기서 세션 mode를 확정한다.
+    // AI 모드는 ai-route 화면에서 경로 선택 후에 확정된다.
+    if (mode === "free") {
+      setSessionMode("FREE");
+    }
     router.push(mode === "ai" ? "/ai-route" : "/plogging");
   };
   // Android에서는 시스템 내비게이션 바 inset을 더해 겹침을 방지한다.

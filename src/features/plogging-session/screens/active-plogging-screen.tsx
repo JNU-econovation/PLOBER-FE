@@ -30,16 +30,20 @@ export function ActivePloggingScreen() {
     addPhotoObjectUrl,
     caloriesBurned,
     distanceMeters,
+    finishSession,
     photoUris,
     resetSession,
+    startSession,
     stepCount,
   } = usePloggingSession();
 
   // 새 세션 시작 시 이전 세션의 누적 데이터(사진/좌표/걸음 등)를 비운다.
   // 사용자가 /report 까지 갔다가 뒤로 와서 새로 시작하는 경우에도 같은 화면이 다시 mount 되므로 안전하다.
+  // reset 직후 시작 시각을 즉시 고정한다.
   useEffect(() => {
     resetSession();
-  }, [resetSession]);
+    startSession();
+  }, [resetSession, startSession]);
 
   // GPS + 만보기 구독은 화면이 마운트되어 있는 동안에만 동작한다.
   // 일시정지 시 누적이 멈추고, 화면 unmount 시 자동으로 해제된다.
@@ -85,7 +89,15 @@ export function ActivePloggingScreen() {
           bottom={Math.max(insets.bottom, 24) + 24}
           isPaused={timer.isPaused}
           onCapturePhoto={handleCapturePhoto}
-          onEnd={() => router.push("/report")}
+          onEnd={() => {
+            // 종료 시점에 timer가 가진 누적 휴식 시간을 세션 컨텍스트로 옮긴다.
+            // (timer는 화면 unmount 시 사라지므로 report에서 다시 못 읽음)
+            const totalElapsedMs = Date.now() - timer.startedAt;
+            const restMs = Math.max(0, totalElapsedMs - timer.elapsedMs);
+            const restSeconds = Math.floor(restMs / 1000);
+            finishSession(restSeconds);
+            router.push("/report");
+          }}
           onTogglePause={timer.toggle}
           photoCount={photoUris.length}
         />
