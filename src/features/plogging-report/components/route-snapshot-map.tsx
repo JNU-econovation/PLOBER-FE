@@ -78,6 +78,7 @@ export function RouteSnapshotMap({
         initialRegion={region}
         isShowLocationButton={false}
         isShowZoomControls={false}
+        isUseTextureViewAndroid
         onInitialized={() => setMapReady(true)}
         style={StyleSheet.absoluteFill}
       >
