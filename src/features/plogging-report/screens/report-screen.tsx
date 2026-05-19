@@ -137,6 +137,7 @@ export function ReportScreen() {
       mapImageUrl: mapImageObjectUrl ?? "",
       photoUrls,
     };
+    console.log("[plogging-complete] requestBody", JSON.stringify(payload, null, 2));
 
     submittedRef.current = true;
     setSubmitting(true);
