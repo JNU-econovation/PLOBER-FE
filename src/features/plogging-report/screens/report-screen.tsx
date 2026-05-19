@@ -137,6 +137,7 @@ export function ReportScreen() {
       mapImageUrl: mapImageObjectUrl ?? "",
       photoUrls,
     };
+    console.log("[plogging-complete] requestBody", JSON.stringify(payload, null, 2));
 
     submittedRef.current = true;
     setSubmitting(true);
@@ -180,10 +181,10 @@ export function ReportScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { 
+          {
             paddingTop: Math.max(insets.top, 44) + 16,
             // 🌟 하단 PrimaryButton 높이 + Safe Area만큼 스크롤 여백 동적 확보
-            paddingBottom: Math.max(insets.bottom, 30) + 120 
+            paddingBottom: Math.max(insets.bottom, 30) + 120,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -196,8 +197,9 @@ export function ReportScreen() {
         />
         <DistanceSummaryCard distanceKm={distanceKm} />
         <ReportMetricsCard metrics={metrics} />
+        <PhotoGallery photoUris={photoUris} />
         <LevelProgressCard />
-        <MemoCard />
+        <ShareButton />
       </ScrollView>
       <PrimaryBottomButton
         onPress={handleComplete}
@@ -361,6 +363,28 @@ function MetricCell({ metric }: { metric: ReportMetric }) {
   );
 }
 
+// 참고 UI: 인증샷 4장을 한 줄에 균등 배치한 갤러리 섹션.
+// 사진이 4장 미만이면 가능한 만큼만 보여주고, 0장이면 섹션 자체를 숨긴다.
+function PhotoGallery({ photoUris }: { photoUris: string[] }) {
+  if (photoUris.length === 0) return null;
+
+  // 참고 UI는 한 행에 최대 4장이 꽉 차게 배치되어 있다.
+  const visiblePhotos = photoUris.slice(0, 4);
+
+  return (
+    <View style={styles.photoGallery}>
+      {visiblePhotos.map((uri, index) => (
+        <Image
+          key={`${uri}-${index}`}
+          accessibilityLabel="플로깅 인증샷"
+          source={{ uri }}
+          style={styles.photoTile}
+        />
+      ))}
+    </View>
+  );
+}
+
 function LevelProgressCard() {
   return (
     <View style={styles.levelCard}>
@@ -385,29 +409,23 @@ function LevelProgressCard() {
   );
 }
 
-function MemoCard() {
+// 참고 UI: 메모카드 없이 SNS 공유 버튼만 단독으로 배치한다.
+function ShareButton() {
   return (
-    <>
-      <Text selectable style={styles.memoTitle}>
-        ✎ 오늘의 기록을 남겨보세요
+    <Pressable
+      accessibilityLabel="SNS 공유하기"
+      accessibilityRole="button"
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.shareButton,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Feather color={colors.icon} name="upload" size={19} />
+      <Text selectable style={styles.shareText}>
+        SNS 공유하기
       </Text>
-      <View style={styles.memoCard}>
-        <Pressable
-          accessibilityLabel="SNS 공유하기"
-          accessibilityRole="button"
-          hitSlop={8}
-          style={({ pressed }) => [
-            styles.shareButton,
-            pressed ? styles.pressed : null,
-          ]}
-        >
-          <Feather color={colors.icon} name="upload" size={19} />
-          <Text selectable style={styles.shareText}>
-            SNS 공유하기
-          </Text>
-        </Pressable>
-      </View>
-    </>
+    </Pressable>
   );
 }
 
@@ -499,25 +517,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  memoCard: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    height: 130,
-    justifyContent: "flex-end",
-    paddingBottom: 20,
-    ...shadows.soft,
-  },
-  memoTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: "500",
-    letterSpacing: 0,
-    marginTop: 8,
-  },
   metricCell: {
     gap: 8,
-    width: "48%",
+    width: "46%",
   },
   metricLabel: {
     color: colors.subtle,
@@ -558,13 +560,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
-  miniRouteSketch: {
-    height: 220,
-    left: 14,
-    position: "absolute",
-    top: 8,
-    transform: [{ scale: 0.58 }],
-    width: 220,
+  // 인증샷 갤러리: 한 행에 4칸이 꽉 차게, 사진 사이는 살짝 간격을 둔다.
+  photoGallery: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+  },
+  photoTile: {
+    aspectRatio: 1,
+    backgroundColor: colors.line,
+    borderRadius: 12,
+    flex: 1,
   },
   pressed: {
     opacity: 0.72,
@@ -617,6 +623,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: "row",
     gap: 10,
+    marginTop: 4,
     minHeight: 39,
     paddingHorizontal: 23,
     ...shadows.soft,
