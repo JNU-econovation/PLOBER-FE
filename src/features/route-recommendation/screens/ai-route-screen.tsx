@@ -34,7 +34,10 @@ export function AiRouteScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed followUserLocation={false} routeVisible zoom={15.1}>
+      {/* 🛠 fix(gps): followUserLocation 기본값(true) 사용하여 사용자의 실제 GPS 위치를 표시하고 카메라가 추적하도록 한다.
+          기존에는 followUserLocation={false}여서 home에서는 잘 잡히던 GPS가 이 화면에서는
+          CAMPUS_CAMERA 고정 좌표에 머물렀다. zoom만 유지한다. */}
+      <PloggingMap dimmed routeVisible zoom={15.1}>
         <RouteHeader onClose={() => router.back()} />
         <View style={styles.routeSketch}>
           <RouteSketch />
