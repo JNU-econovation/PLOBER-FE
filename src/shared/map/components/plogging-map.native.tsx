@@ -24,6 +24,7 @@ export function PloggingMap({
   zoom,
   followUserLocation = true,
   trashBins,
+  toilets,
 }: PloggingMapProps) {
   const mapRef = useRef<NaverMapViewRef>(null);
   const { position } = useDeviceLocation();
@@ -126,10 +127,18 @@ export function PloggingMap({
         ) : null}
         {trashBins?.map((bin) => (
           <NaverMapMarkerOverlay
-            key={bin.id}
+            key={`trash-${bin.id}`}
             latitude={bin.latitude}
             longitude={bin.longitude}
             tintColor={bin.tintColor}
+          />
+        ))}
+        {toilets?.map((toilet) => (
+          <NaverMapMarkerOverlay
+            key={`toilet-${toilet.id}`}
+            latitude={toilet.latitude}
+            longitude={toilet.longitude}
+            tintColor={toilet.tintColor}
           />
         ))}
       </NaverMapView>

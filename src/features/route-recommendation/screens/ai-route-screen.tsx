@@ -11,6 +11,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePloggingSession } from "@/src/features/plogging-session";
+import {
+  getToiletTintColor,
+  useNearbyToilets,
+} from "@/src/features/public-facilities";
 import { PloggingMap, RouteSketch } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -31,18 +35,33 @@ export function AiRouteScreen() {
   const [selectedRouteId, setSelectedRouteId] = useState<RouteOptionId>(
     routeOptions[0].id,
   );
+  const [restroomVisible, setRestroomVisible] = useState(false);
+  const toiletsState = useNearbyToilets({ enabled: restroomVisible });
+  const toiletMarkers =
+    restroomVisible && toiletsState.status === "success"
+      ? toiletsState.toilets.map((toilet) => ({
+          id: toilet.id,
+          latitude: toilet.latitude,
+          longitude: toilet.longitude,
+          tintColor: getToiletTintColor(toilet.openTimeType),
+        }))
+      : undefined;
 
   return (
     <ScreenRoot>
       {/* 🛠 fix(gps): followUserLocation 기본값(true) 사용하여 사용자의 실제 GPS 위치를 표시하고 카메라가 추적하도록 한다.
           기존에는 followUserLocation={false}여서 home에서는 잘 잡히던 GPS가 이 화면에서는
           CAMPUS_CAMERA 고정 좌표에 머물렀다. zoom만 유지한다. */}
-      <PloggingMap dimmed routeVisible zoom={15.1}>
+      <PloggingMap dimmed routeVisible toilets={toiletMarkers} zoom={15.1}>
         <RouteHeader onClose={() => router.back()} />
         <View style={styles.routeSketch}>
           <RouteSketch />
         </View>
-        <MapControls top={Math.max(insets.top, 44) + 100} />
+        <MapControls
+          onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
+          restroomActive={restroomVisible}
+          top={Math.max(insets.top, 44) + 100}
+        />
         
         <ScrollView
           contentContainerStyle={styles.routeCardsContent}
