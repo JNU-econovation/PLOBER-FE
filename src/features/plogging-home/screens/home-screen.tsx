@@ -15,6 +15,12 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
 
 import { usePloggingSession } from "@/src/features/plogging-session";
+import {
+  getToiletTintColor,
+  getTrashBinTintColor,
+  useNearbyToilets,
+  useNearbyTrashBins,
+} from "@/src/features/public-facilities";
 
 // 시작 버튼 + 위/아래 같은 간격(41px)까지는 솔리드, 그 위로는 페이드
 const START_BUTTON_HEIGHT = 96;
@@ -24,7 +30,28 @@ export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // Safe Area 훅 추가
   const [mode, setMode] = useState<PloggingMode>("ai");
+  const [restroomVisible, setRestroomVisible] = useState(false);
   const { setMode: setSessionMode } = usePloggingSession();
+  const trashBinsState = useNearbyTrashBins();
+  const toiletsState = useNearbyToilets({ enabled: restroomVisible });
+  const trashBinMarkers =
+    trashBinsState.status === "success"
+      ? trashBinsState.trashBins.map((bin) => ({
+          id: bin.id,
+          latitude: bin.latitude,
+          longitude: bin.longitude,
+          tintColor: getTrashBinTintColor(bin.trashType),
+        }))
+      : undefined;
+  const toiletMarkers =
+    restroomVisible && toiletsState.status === "success"
+      ? toiletsState.toilets.map((toilet) => ({
+          id: toilet.id,
+          latitude: toilet.latitude,
+          longitude: toilet.longitude,
+          tintColor: getToiletTintColor(toilet.openTimeType),
+        }))
+      : undefined;
 
   const handleStart = () => {
     // 자유모드는 바로 플로깅 시작하므로 여기서 세션 mode를 확정한다.
@@ -49,10 +76,14 @@ export function HomeScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed>
+      <PloggingMap dimmed toilets={toiletMarkers} trashBins={trashBinMarkers}>
         <ModeSwitch onChange={setMode} value={mode} />
         {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
-        <MapControls top={Math.max(insets.top, 44) + 80} />
+        <MapControls
+          onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
+          restroomActive={restroomVisible}
+          top={Math.max(insets.top, 44) + 80}
+        />
 
         <LinearGradient
           colors={[

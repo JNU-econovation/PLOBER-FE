@@ -1,7 +1,11 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
+import {
+  getToiletTintColor,
+  useNearbyToilets,
+} from "@/src/features/public-facilities";
 import { PloggingMap } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -25,6 +29,17 @@ export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
   const timer = usePloggingTimer();
+  const [restroomVisible, setRestroomVisible] = useState(false);
+  const toiletsState = useNearbyToilets({ enabled: restroomVisible });
+  const toiletMarkers =
+    restroomVisible && toiletsState.status === "success"
+      ? toiletsState.toilets.map((toilet) => ({
+          id: toilet.id,
+          latitude: toilet.latitude,
+          longitude: toilet.longitude,
+          tintColor: getToiletTintColor(toilet.openTimeType),
+        }))
+      : undefined;
   const {
     addPhoto,
     addPhotoObjectUrl,
@@ -75,7 +90,7 @@ export function ActivePloggingScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed zoom={17}>
+      <PloggingMap dimmed toilets={toiletMarkers} zoom={17}>
         {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
         <PloggingTimerCard
           formattedElapsed={timer.formatted}
@@ -83,7 +98,11 @@ export function ActivePloggingScreen() {
           top={Math.max(insets.top, 44) + 16}
         />
         {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
-        <MapControls top={Math.max(insets.top, 44) + 184} />
+        <MapControls
+          onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
+          restroomActive={restroomVisible}
+          top={Math.max(insets.top, 44) + 184}
+        />
         {/* 하단 제스처 바 영역을 고려하여 bottom 위치 동적 할당 */}
         <ActionDock
           bottom={Math.max(insets.bottom, 24) + 24}

@@ -87,20 +87,38 @@ export function BackButton({
   );
 }
 
-export function MapControls({ top = 176 }: { top?: number }) {
+export function MapControls({
+  top = 176,
+  restroomActive = false,
+  onToggleRestroom,
+}: {
+  top?: number;
+  restroomActive?: boolean;
+  onToggleRestroom?: () => void;
+}) {
   return (
     <View style={[styles.mapControls, { top }]}>
       <FigmaMapControlButton label="날씨" source={mapControlWeatherIcon} />
-      <FigmaMapControlButton label="화장실" source={mapControlRestroomIcon} />
+      <FigmaMapControlButton
+        accessibilityState={{ selected: restroomActive }}
+        active={restroomActive}
+        label={restroomActive ? "화장실 숨기기" : "화장실 표시"}
+        onPress={onToggleRestroom}
+        source={mapControlRestroomIcon}
+      />
     </View>
   );
 }
 
 function FigmaMapControlButton({
+  accessibilityState,
+  active = false,
   label,
   onPress,
   source,
 }: {
+  accessibilityState?: ComponentProps<typeof Pressable>["accessibilityState"];
+  active?: boolean;
   label: string;
   onPress?: () => void;
   source: MapControlIconSource;
@@ -109,10 +127,12 @@ function FigmaMapControlButton({
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      accessibilityState={accessibilityState}
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => [
         styles.figmaIconCircle,
+        active ? styles.figmaIconCircleActive : null,
         pressed ? styles.pressed : null,
       ]}
     >
@@ -120,6 +140,7 @@ function FigmaMapControlButton({
         contentFit="contain"
         source={source}
         style={styles.figmaMapIcon}
+        tintColor={active ? colors.surface : undefined}
       />
     </Pressable>
   );
@@ -226,6 +247,7 @@ const styles = StyleSheet.create<{
   iconCircle: ViewStyle;
   backButton: ViewStyle;
   figmaIconCircle: ViewStyle;
+  figmaIconCircleActive: ViewStyle;
   figmaMapIcon: ImageStyle;
   pressed: ViewStyle;
   mapControls: ViewStyle;
@@ -251,6 +273,9 @@ const styles = StyleSheet.create<{
     justifyContent: "center",
     width: 46,
     ...shadows.soft,
+  },
+  figmaIconCircleActive: {
+    backgroundColor: colors.primary,
   },
   figmaMapIcon: {
     height: 24,
