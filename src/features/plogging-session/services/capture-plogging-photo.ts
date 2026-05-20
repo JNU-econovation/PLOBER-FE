@@ -2,7 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Alert, Linking } from "react-native";
 
 export type CapturePloggingPhotoResult =
-  | { status: "captured"; uri: string }
+  | { status: "captured"; fileName: string; mimeType: string; uri: string }
   | { status: "canceled" }
   | { status: "permission-denied" }
   | { status: "error"; message: string };
@@ -41,12 +41,20 @@ export async function capturePloggingPhoto(): Promise<CapturePloggingPhotoResult
 
     if (__DEV__) {
       console.log("[plogging-photo] captured", {
+        fileName: asset.fileName,
         height: asset.height,
+        mimeType: asset.mimeType,
+        uri: asset.uri,
         width: asset.width,
       });
     }
 
-    return { status: "captured", uri: asset.uri };
+    return {
+      fileName: asset.fileName ?? fileNameFromUri(asset.uri),
+      mimeType: asset.mimeType ?? mimeTypeFromUri(asset.uri),
+      status: "captured",
+      uri: asset.uri,
+    };
   } catch (error) {
     if (__DEV__) {
       console.log("[plogging-photo] capture failed", {
@@ -61,6 +69,20 @@ export async function capturePloggingPhoto(): Promise<CapturePloggingPhotoResult
           : "사진 촬영 중 문제가 발생했습니다.",
     };
   }
+}
+
+function fileNameFromUri(uri: string): string {
+  const name = uri.split("/").pop();
+  return name && name.includes(".") ? name : `plogging-${Date.now()}.jpg`;
+}
+
+function mimeTypeFromUri(uri: string): string {
+  const extension = uri.split(".").pop()?.toLowerCase();
+  if (extension === "png") return "image/png";
+  if (extension === "heic") return "image/heic";
+  if (extension === "heif") return "image/heif";
+  if (extension === "webp") return "image/webp";
+  return "image/jpeg";
 }
 
 async function ensureCameraPermission() {

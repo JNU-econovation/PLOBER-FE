@@ -96,7 +96,8 @@ export function HomeScreen() {
     setReportSubmitting(true);
     try {
       const analysisResult = await analyzeTrashPhoto({
-        contentType: "image/jpeg",
+        contentType: result.mimeType,
+        fileName: result.fileName,
         latitude: position?.latitude,
         localUri: result.uri,
         longitude: position?.longitude,

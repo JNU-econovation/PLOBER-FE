@@ -77,9 +77,10 @@ export function ActivePloggingScreen() {
     // 백그라운드로 S3 업로드. 사용자 동선은 막지 않고, 실패해도 다음 사진에 영향 없음.
     void (async () => {
       const [uploadResult, analysisResult] = await Promise.all([
-        uploadPloggingPhoto(result.uri, "image/jpeg"),
+        uploadPloggingPhoto(result.uri, toPhotoUploadContentType(result.mimeType)),
         analyzeTrashPhoto({
-          contentType: "image/jpeg",
+          contentType: result.mimeType,
+          fileName: result.fileName,
           latitude: position?.latitude,
           localUri: result.uri,
           longitude: position?.longitude,
@@ -153,6 +154,20 @@ function formatKilometers(meters: number): string {
 
 function formatInteger(value: number): string {
   return Math.round(value).toLocaleString("ko-KR");
+}
+
+function toPhotoUploadContentType(contentType: string) {
+  if (
+    contentType === "image/jpeg" ||
+    contentType === "image/png" ||
+    contentType === "image/webp" ||
+    contentType === "image/heic" ||
+    contentType === "image/heif" ||
+    contentType === "image/avif"
+  ) {
+    return contentType;
+  }
+  return "image/jpeg";
 }
 
 function PloggingTimerCard({
