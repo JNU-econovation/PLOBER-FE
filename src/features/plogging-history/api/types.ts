@@ -14,6 +14,13 @@ export type GetPloggingSessionsResponse = {
   hasNext: boolean;
 };
 
+export type GetPloggingSessionsRequest = {
+  page: number;
+  size: number;
+  sort?: string[];
+  userId: number;
+};
+
 export type PloggingSessionDetail = {
   ploggingSessionId: number;
   mode: PloggingMode;
@@ -29,7 +36,13 @@ export type PloggingSessionDetail = {
   photoUrls: string[];
 };
 
+export type GetPloggingSessionRequest = {
+  ploggingSessionId: number;
+  userId: number;
+};
+
 export type GetMonthlyPloggingSummaryRequest = {
+  userId: number;
   year: number;
   month: number;
 };
@@ -55,6 +68,7 @@ export type DayOfWeek =
 
 export type GetWeeklyPloggingSummaryRequest = {
   startDate: string;
+  userId: number;
 };
 
 export type DailyPloggingStat = {

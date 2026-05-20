@@ -9,6 +9,7 @@ const DEFAULT_CONTENT_TYPE: PhotoUploadContentType = "image/jpeg";
 
 export async function uploadPloggingPhoto(
   localUri: string,
+  userId: number,
   contentType: PhotoUploadContentType = DEFAULT_CONTENT_TYPE
 ): Promise<UploadPloggingPhotoResult> {
   try {
@@ -18,7 +19,10 @@ export async function uploadPloggingPhoto(
       });
     }
 
-    const { uploadUrl, objectUrl } = await getPhotoUploadUrl({ contentType });
+    const { uploadUrl, objectUrl } = await getPhotoUploadUrl({
+      contentType,
+      userId,
+    });
 
     const fileResponse = await fetch(localUri);
     if (!fileResponse.ok) {

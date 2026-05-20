@@ -17,8 +17,6 @@ import { BackButton, ScreenRoot, StatNumber } from "@/src/shared/ui";
 import type { PloggingSessionDetail } from "../api/types";
 import { usePloggingSessionDetail } from "../hooks/use-plogging-session-detail";
 
-const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
-
 export function PloggingSessionDetailScreen({
   ploggingSessionId,
 }: {

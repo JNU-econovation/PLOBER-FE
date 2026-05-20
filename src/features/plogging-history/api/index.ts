@@ -6,6 +6,8 @@ export type {
   DailyPloggingStat,
   DayOfWeek,
   GetMonthlyPloggingSummaryRequest,
+  GetPloggingSessionRequest,
+  GetPloggingSessionsRequest,
   GetPloggingSessionsResponse,
   GetWeeklyPloggingSummaryRequest,
   MonthlyPloggingSummary,

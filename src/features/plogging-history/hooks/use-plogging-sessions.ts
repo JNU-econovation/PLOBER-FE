@@ -11,12 +11,15 @@ type PloggingSessionsState =
   | { status: "success"; sessions: PloggingSessionSummary[]; hasNext: boolean }
   | { status: "error"; message: string };
 
+const DEFAULT_PAGE = 0;
+const DEFAULT_PAGE_SIZE = 20;
+
 export function usePloggingSessions(): PloggingSessionsState {
-  const { status: authStatus } = useAuthSession();
+  const { session, status: authStatus } = useAuthSession();
   const [state, setState] = useState<PloggingSessionsState>({ status: "idle" });
 
   useEffect(() => {
-    if (authStatus !== "authenticated") {
+    if (authStatus !== "authenticated" || !session?.userId) {
       setState({ status: "idle" });
       return;
     }
@@ -24,7 +27,11 @@ export function usePloggingSessions(): PloggingSessionsState {
     let mounted = true;
     setState({ status: "loading" });
 
-    getPloggingSessions()
+    getPloggingSessions({
+      page: DEFAULT_PAGE,
+      size: DEFAULT_PAGE_SIZE,
+      userId: session.userId,
+    })
       .then((response) => {
         if (!mounted) return;
         setState({
@@ -47,7 +54,7 @@ export function usePloggingSessions(): PloggingSessionsState {
     return () => {
       mounted = false;
     };
-  }, [authStatus]);
+  }, [authStatus, session?.userId]);
 
   return state;
 }

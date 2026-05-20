@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
+import { useAuthSession } from "@/src/features/auth";
 import {
   getToiletTintColor,
   useNearbyToilets,
@@ -30,6 +31,7 @@ type LiveStat = { label: string; unit: string; value: string };
 export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
+  const { session } = useAuthSession();
   const timer = usePloggingTimer();
   const { position } = useDeviceLocation();
   const [heatmapVisible, setHeatmapVisible] = useState(false);
@@ -76,8 +78,18 @@ export function ActivePloggingScreen() {
 
     // 백그라운드로 S3 업로드. 사용자 동선은 막지 않고, 실패해도 다음 사진에 영향 없음.
     void (async () => {
+      const uploadPromise = session?.userId
+        ? uploadPloggingPhoto(
+            result.uri,
+            session.userId,
+            toPhotoUploadContentType(result.mimeType)
+          )
+        : Promise.resolve({
+            status: "error" as const,
+            message: "로그인 정보가 없어 인증샷 업로드를 건너뜁니다.",
+          });
       const [uploadResult, analysisResult] = await Promise.all([
-        uploadPloggingPhoto(result.uri, toPhotoUploadContentType(result.mimeType)),
+        uploadPromise,
         analyzeTrashPhoto({
           contentType: result.mimeType,
           fileName: result.fileName,

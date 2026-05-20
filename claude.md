@@ -38,6 +38,21 @@
 - Communication: 모든 API 요청은 services/ 폴더 내에서 관리.
 - Git: 커밋 메시지는 한글 사용 권장 (예: [Feat] AI 경로 추천 카드 UI 구현).
 
+## API Change Rule
+
+API 관련 코드를 추가, 수정, 디버깅할 때는 반드시 먼저 `docs/api.md`를 확인한다.
+
+`docs/api.md`를 아래 항목의 기준 문서로 사용한다:
+
+- endpoint path
+- HTTP method
+- query/path parameter
+- request body
+- response shape
+- upload 및 multipart 규칙
+
+기존 프론트엔드 코드와 `docs/api.md`가 충돌하면, API 계약은 `docs/api.md`를 우선한다.
+
 ## 🔁 Code Change Workflow
 
 코드 수정 요청을 받으면 아래 순서를 반드시 따른다:

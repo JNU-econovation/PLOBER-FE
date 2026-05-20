@@ -14,13 +14,13 @@ type PloggingSessionDetailState =
 export function usePloggingSessionDetail(
   ploggingSessionId: number | null
 ): PloggingSessionDetailState {
-  const { status: authStatus } = useAuthSession();
+  const { session, status: authStatus } = useAuthSession();
   const [state, setState] = useState<PloggingSessionDetailState>({
     status: "idle",
   });
 
   useEffect(() => {
-    if (authStatus !== "authenticated") {
+    if (authStatus !== "authenticated" || !session?.userId) {
       setState({ status: "idle" });
       return;
     }
@@ -32,7 +32,10 @@ export function usePloggingSessionDetail(
     let mounted = true;
     setState({ status: "loading" });
 
-    getPloggingSession(ploggingSessionId)
+    getPloggingSession({
+      ploggingSessionId,
+      userId: session.userId,
+    })
       .then((detail) => {
         if (!mounted) return;
         setState({ status: "success", detail });
@@ -51,7 +54,7 @@ export function usePloggingSessionDetail(
     return () => {
       mounted = false;
     };
-  }, [authStatus, ploggingSessionId]);
+  }, [authStatus, ploggingSessionId, session?.userId]);
 
   return state;
 }

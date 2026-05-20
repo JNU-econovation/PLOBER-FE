@@ -24,6 +24,11 @@ export type CompletePloggingSessionRequest = {
   photoUrls: string[];
 };
 
+export type CompletePloggingSessionParams = {
+  payload: CompletePloggingSessionRequest;
+  userId: number;
+};
+
 export type CompletePloggingSessionResponse = {
   ploggingSessionId: number;
 };
@@ -38,6 +43,7 @@ export type MapImageUploadContentType =
 
 export type GetMapImageUploadUrlRequest = {
   contentType: MapImageUploadContentType;
+  userId: number;
 };
 
 export type GetMapImageUploadUrlResponse = {
@@ -55,6 +61,7 @@ export type PhotoUploadContentType =
 
 export type GetPhotoUploadUrlRequest = {
   contentType: PhotoUploadContentType;
+  userId: number;
 };
 
 export type GetPhotoUploadUrlResponse = {

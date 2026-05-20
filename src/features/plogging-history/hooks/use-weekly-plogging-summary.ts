@@ -20,13 +20,13 @@ type Options = {
 export function useWeeklyPloggingSummary({
   startDate,
 }: Options): WeeklyPloggingSummaryState {
-  const { status: authStatus } = useAuthSession();
+  const { session, status: authStatus } = useAuthSession();
   const [state, setState] = useState<WeeklyPloggingSummaryState>({
     status: "idle",
   });
 
   useEffect(() => {
-    if (authStatus !== "authenticated") {
+    if (authStatus !== "authenticated" || !session?.userId) {
       setState({ status: "idle" });
       return;
     }
@@ -34,7 +34,7 @@ export function useWeeklyPloggingSummary({
     let mounted = true;
     setState({ status: "loading" });
 
-    getWeeklyPloggingSummary({ startDate })
+    getWeeklyPloggingSummary({ startDate, userId: session.userId })
       .then((summary) => {
         if (!mounted) return;
         setState({ status: "success", summary });
@@ -53,7 +53,7 @@ export function useWeeklyPloggingSummary({
     return () => {
       mounted = false;
     };
-  }, [authStatus, startDate]);
+  }, [authStatus, session?.userId, startDate]);
 
   return state;
 }
