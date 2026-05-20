@@ -12,14 +12,12 @@ type ServerErrorBody = {
 };
 
 export async function loginWithAppleToken(
-  identityToken: string,
-  name: string | null
+  identityToken: string
 ): Promise<AppleLoginResponse> {
   const url = new URL(APPLE_LOGIN_PATH, API_BASE_URL).toString();
 
   if (__DEV__) {
     console.log("[apple] login fetch request", {
-      hasName: Boolean(name),
       identityTokenLength: identityToken.length,
       url,
     });
@@ -30,7 +28,6 @@ export async function loginWithAppleToken(
     response = await fetch(url, {
       body: JSON.stringify({
         identityToken,
-        name,
       } satisfies AppleLoginRequest),
       headers: {
         "Content-Type": "application/json",

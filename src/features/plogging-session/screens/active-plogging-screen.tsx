@@ -6,6 +6,7 @@ import {
   getToiletTintColor,
   useNearbyToilets,
 } from "@/src/features/public-facilities";
+import { useDeviceLocation } from "@/src/shared/location";
 import { PloggingMap } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
@@ -20,6 +21,7 @@ import {
 import { usePloggingSession } from "../hooks/use-plogging-session";
 import { usePloggingTimer } from "../hooks/use-plogging-timer";
 import { usePloggingTracker } from "../hooks/use-plogging-tracker";
+import { analyzeTrashPhoto } from "../services/analyze-trash-photo";
 import { capturePloggingPhoto } from "../services/capture-plogging-photo";
 import { uploadPloggingPhoto } from "../services/upload-plogging-photo";
 
@@ -29,6 +31,8 @@ export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
   const timer = usePloggingTimer();
+  const { position } = useDeviceLocation();
+  const [heatmapVisible, setHeatmapVisible] = useState(false);
   const [restroomVisible, setRestroomVisible] = useState(false);
   const toiletsState = useNearbyToilets({ enabled: restroomVisible });
   const toiletMarkers =
@@ -72,9 +76,20 @@ export function ActivePloggingScreen() {
 
     // 백그라운드로 S3 업로드. 사용자 동선은 막지 않고, 실패해도 다음 사진에 영향 없음.
     void (async () => {
-      const uploadResult = await uploadPloggingPhoto(result.uri, "image/jpeg");
+      const [uploadResult, analysisResult] = await Promise.all([
+        uploadPloggingPhoto(result.uri, "image/jpeg"),
+        analyzeTrashPhoto({
+          contentType: "image/jpeg",
+          latitude: position?.latitude,
+          localUri: result.uri,
+          longitude: position?.longitude,
+        }),
+      ]);
       if (uploadResult.status === "uploaded") {
         addPhotoObjectUrl(result.uri, uploadResult.objectUrl);
+      }
+      if (__DEV__ && analysisResult.status === "accepted") {
+        console.log("[trash-photo-analysis] accepted");
       }
     })();
   };
@@ -90,7 +105,12 @@ export function ActivePloggingScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed toilets={toiletMarkers} zoom={17}>
+      <PloggingMap
+        dimmed
+        heatmapVisible={heatmapVisible}
+        toilets={toiletMarkers}
+        zoom={17}
+      >
         {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
         <PloggingTimerCard
           formattedElapsed={timer.formatted}
@@ -99,6 +119,8 @@ export function ActivePloggingScreen() {
         />
         {/* 타이머 카드(약 152px) 아래로 16px 여유를 두고 컨트롤 배치: 16 + 152 + 16 ≈ 184 */}
         <MapControls
+          heatmapActive={heatmapVisible}
+          onToggleHeatmap={() => setHeatmapVisible((prev) => !prev)}
           onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
           restroomActive={restroomVisible}
           top={Math.max(insets.top, 44) + 184}

@@ -15,8 +15,16 @@ export type ToiletMarker = {
   tintColor?: string;
 };
 
+export type HotspotPolygon = {
+  id: string;
+  coords: { latitude: number; longitude: number }[];
+  trashScore: number;
+};
+
 export type PloggingMapProps = PropsWithChildren<{
   routeVisible?: boolean;
+  routePoints?: { latitude: number; longitude: number }[];
+  heatmapVisible?: boolean;
   dimmed?: boolean;
   style?: StyleProp<ViewStyle>;
   /**

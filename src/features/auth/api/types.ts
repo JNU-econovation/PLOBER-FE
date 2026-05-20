@@ -4,7 +4,6 @@ export type KakaoLoginRequest = {
 
 export type AppleLoginRequest = {
   identityToken: string;
-  name: string | null;
 };
 
 export type AuthLoginResponse = {

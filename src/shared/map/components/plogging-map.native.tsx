@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   NaverMapMarkerOverlay,
+  NaverMapPolygonOverlay,
   NaverMapPolylineOverlay,
   NaverMapView,
   type NaverMapViewRef,
@@ -10,6 +11,8 @@ import {
 import { useDeviceLocation } from "../../location";
 import { colors } from "../../theme";
 import { CAMPUS_CAMERA, ROUTE_COORDS } from "../data/map-data";
+import { useHotspotPolygons } from "../hooks/use-hotspot-polygons";
+import { getHotspotColor } from "../services/hotspot-tiles";
 import type { PloggingMapProps } from "./types";
 
 // 이 이상 좌표가 변할 때만 카메라를 다시 애니메이션한다(약 22m).
@@ -19,6 +22,8 @@ const CAMERA_ANIMATE_THRESHOLD = 0.0002;
 export function PloggingMap({
   children,
   routeVisible = false,
+  routePoints,
+  heatmapVisible = false,
   dimmed = false,
   style,
   zoom,
@@ -28,6 +33,9 @@ export function PloggingMap({
 }: PloggingMapProps) {
   const mapRef = useRef<NaverMapViewRef>(null);
   const { position } = useDeviceLocation();
+  const hotspots = useHotspotPolygons(heatmapVisible);
+  const visibleRoutePoints =
+    routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
 
   // 최초 카메라는 mount 시점 공유 위치(없으면 CAMPUS_CAMERA fallback).
   // 이후 위치 변경은 animateCameraTo로 부드럽게 이동시킨다.
@@ -118,10 +126,23 @@ export function PloggingMap({
         onInitialized={handleInitialized}
         style={StyleSheet.absoluteFill}
       >
+        {heatmapVisible
+          ? hotspots.polygons.map((polygon) => (
+              <NaverMapPolygonOverlay
+                key={polygon.id}
+                color={getHotspotColor(polygon.trashScore)}
+                coords={polygon.coords}
+                outlineColor="rgba(185, 28, 28, 0.12)"
+                outlineWidth={0}
+                zIndex={1}
+              />
+            ))
+          : null}
         {routeVisible ? (
           <NaverMapPolylineOverlay
             color={colors.primary}
-            coords={ROUTE_COORDS}
+            coords={visibleRoutePoints}
+            zIndex={2}
             width={8}
           />
         ) : null}

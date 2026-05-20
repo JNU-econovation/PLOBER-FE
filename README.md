@@ -125,5 +125,16 @@ import { ScreenRoot } from "@/src/shared/ui";
 ```bash
 npm run lint
 npx tsc --noEmit
+npx expo-doctor
 npx expo export --platform web
 ```
+
+## iOS 출시 준비
+
+```bash
+npx eas-cli@latest build -p ios --profile preview
+npx eas-cli@latest build -p ios --profile production
+npx eas-cli@latest submit -p ios --profile production
+```
+
+출시 전 점검 항목은 `docs/ios-release-report.md`를 확인합니다.

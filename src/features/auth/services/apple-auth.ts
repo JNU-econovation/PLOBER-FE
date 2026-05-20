@@ -3,12 +3,6 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { loginWithAppleToken } from "../api";
 import { saveSession } from "./session";
 
-function getAppleGivenName(
-  fullName: AppleAuthentication.AppleAuthenticationFullName | null
-) {
-  return fullName?.givenName ?? null;
-}
-
 function getErrorLogPayload(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -73,15 +67,10 @@ export async function completeAppleLogin() {
 
   if (__DEV__) {
     console.log("[apple] identityToken", credential.identityToken);
-    console.log("[apple] backend login start", {
-      name: getAppleGivenName(credential.fullName),
-    });
+    console.log("[apple] backend login start");
   }
 
-  const session = await loginWithAppleToken(
-    credential.identityToken,
-    getAppleGivenName(credential.fullName)
-  );
+  const session = await loginWithAppleToken(credential.identityToken);
   await saveSession(session);
 
   if (__DEV__) {

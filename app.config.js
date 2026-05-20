@@ -31,6 +31,11 @@ export default ({ config }) => ({
             NSIncludesSubdomains: true,
             NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
           },
+          "54.180.111.192": {
+            NSExceptionAllowsInsecureHTTPLoads: true,
+            NSIncludesSubdomains: true,
+            NSTemporaryExceptionAllowsInsecureHTTPLoads: true,
+          },
           "ec2-13-125-28-197.ap-northeast-2.compute.amazonaws.com": {
             NSExceptionAllowsInsecureHTTPLoads: true,
             NSIncludesSubdomains: true,

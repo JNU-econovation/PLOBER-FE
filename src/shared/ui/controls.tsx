@@ -89,16 +89,30 @@ export function BackButton({
 
 export function MapControls({
   top = 176,
+  heatmapActive = false,
   restroomActive = false,
+  onToggleHeatmap,
   onToggleRestroom,
 }: {
   top?: number;
+  heatmapActive?: boolean;
   restroomActive?: boolean;
+  onToggleHeatmap?: () => void;
   onToggleRestroom?: () => void;
 }) {
   return (
     <View style={[styles.mapControls, { top }]}>
-      <FigmaMapControlButton label="날씨" source={mapControlWeatherIcon} />
+      {onToggleHeatmap ? (
+        <FeatherMapControlButton
+          accessibilityState={{ selected: heatmapActive }}
+          active={heatmapActive}
+          label={heatmapActive ? "히트맵 숨기기" : "히트맵 표시"}
+          name="activity"
+          onPress={onToggleHeatmap}
+        />
+      ) : (
+        <FigmaMapControlButton label="날씨" source={mapControlWeatherIcon} />
+      )}
       <FigmaMapControlButton
         accessibilityState={{ selected: restroomActive }}
         active={restroomActive}
@@ -107,6 +121,37 @@ export function MapControls({
         source={mapControlRestroomIcon}
       />
     </View>
+  );
+}
+
+function FeatherMapControlButton({
+  accessibilityState,
+  active = false,
+  label,
+  name,
+  onPress,
+}: {
+  accessibilityState?: ComponentProps<typeof Pressable>["accessibilityState"];
+  active?: boolean;
+  label: string;
+  name: FeatherName;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={accessibilityState}
+      hitSlop={8}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.figmaIconCircle,
+        active ? styles.figmaIconCircleActive : null,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Feather color={active ? colors.surface : colors.icon} name={name} size={23} />
+    </Pressable>
   );
 }
 
