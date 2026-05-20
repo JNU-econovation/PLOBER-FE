@@ -9,6 +9,12 @@ import * as Location from "expo-location";
 
 // 부정확한 좌표는 지도 카메라 점프를 유발하므로 버린다.
 const ACCURACY_THRESHOLD_METERS = 50;
+// TODO: 히트맵 QA가 끝나면 false로 돌려 실제 기기 위치를 사용한다.
+const FORCE_CNU_LOCATION_FOR_HEATMAP_QA = true;
+const CNU_TEST_POSITION = {
+  latitude: 35.1768,
+  longitude: 126.9102,
+};
 
 export type DevicePosition = {
   latitude: number;
@@ -41,6 +47,19 @@ export function DeviceLocationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
     let cancelled = false;
+
+    if (__DEV__ && FORCE_CNU_LOCATION_FOR_HEATMAP_QA) {
+      setState({
+        permission: "granted",
+        position: {
+          ...CNU_TEST_POSITION,
+          accuracy: 5,
+          timestamp: Date.now(),
+        },
+      });
+      console.log("[device-location] forced CNU test position", CNU_TEST_POSITION);
+      return;
+    }
 
     (async () => {
       try {

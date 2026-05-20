@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuthSession } from "@/src/features/auth";
 import { completePloggingSession } from "@/src/features/plogging-session/api/complete-plogging-session";
+import type { CompletePloggingSessionRequest } from "@/src/features/plogging-session/api/types";
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
 
@@ -272,12 +273,12 @@ export function ReportScreen() {
         setMapImageObjectUrl(uploadResult.objectUrl);
       }
 
-      const payload = {
+      const payload: CompletePloggingSessionRequest = {
         mode,
         startedAt: new Date(startedAtMs).toISOString(),
         finishedAt: new Date(finishedAt).toISOString(),
         distanceMeters: Math.round(distanceMeters),
-        stepCount,
+        stepCount: Math.round(stepCount),
         caloriesBurned: Math.round(caloriesBurned),
         ploggingSeconds,
         restSeconds,

@@ -202,7 +202,9 @@ export function PloggingMap({
           />
         ))}
       </NaverMapView>
-      {dimmed ? <View style={styles.dimmed} /> : null}
+      {dimmed ? (
+        <View style={[styles.dimmed, heatmapVisible ? styles.dimmedHeatmap : null]} />
+      ) : null}
       {heatmapLegendVisible ? <HeatmapLegend top={heatmapLegendTop} /> : null}
       {children}
     </View>
@@ -247,6 +249,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255, 255, 255, 0.50)",
     pointerEvents: "none",
+  },
+  dimmedHeatmap: {
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
   },
   routeArrowHead: {
     borderBottomColor: colors.surface,

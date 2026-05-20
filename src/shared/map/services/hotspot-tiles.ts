@@ -7,13 +7,18 @@ const HOTSPOT_TILE_URL =
   "http://54.180.111.192:3000/predicted_hotspots/{z}/{x}/{y}";
 const HOTSPOT_SOURCE_LAYER = "predicted_hotspots";
 const HOTSPOT_ZOOM = 14;
-const MAX_POLYGONS_PER_TILE = 160;
+const MAX_CENTER_TILE_POLYGONS = 1200;
+const MAX_NEIGHBOR_TILE_POLYGONS = 80;
 const NEIGHBOR_TILE_OFFSETS = [-1, 0, 1] as const;
 
 type TileCoordinate = {
   z: number;
   x: number;
   y: number;
+};
+
+type TileRequest = TileCoordinate & {
+  maxPolygons: number;
 };
 
 type GeoJsonPolygon = {
@@ -36,7 +41,13 @@ export async function getHotspotPolygonsNear(point: {
   longitude: number;
 }): Promise<HotspotPolygon[]> {
   const center = lonLatToTile(point.longitude, point.latitude, HOTSPOT_ZOOM);
-  const tiles = getNeighborTiles(center);
+  const tiles = getNeighborTiles(center).map((tile) => ({
+    ...tile,
+    maxPolygons:
+      tile.x === center.x && tile.y === center.y
+        ? MAX_CENTER_TILE_POLYGONS
+        : MAX_NEIGHBOR_TILE_POLYGONS,
+  }));
   const tilePolygons = await Promise.all(tiles.map(getHotspotPolygonsForTile));
 
   return tilePolygons.flat();
@@ -51,7 +62,7 @@ export function getHotspotTileKey(point: {
 }
 
 async function getHotspotPolygonsForTile(
-  tile: TileCoordinate
+  tile: TileRequest
 ): Promise<HotspotPolygon[]> {
   const response = await fetch(
     HOTSPOT_TILE_URL.replace("{z}", String(tile.z))
@@ -82,7 +93,7 @@ async function getHotspotPolygonsForTile(
     };
   })
     .sort((a, b) => b.trashScore - a.trashScore)
-    .slice(0, MAX_POLYGONS_PER_TILE);
+    .slice(0, tile.maxPolygons);
 
   for (const rankedFeature of rankedFeatures) {
     const feature = layer.feature(rankedFeature.index);
