@@ -10,6 +10,10 @@ export type GetMyPloggingStatsRequest = {
   userId: number;
 };
 
+export type DeleteMyAccountRequest = {
+  userId: number;
+};
+
 export type MyPloggingStats = {
   totalPloggingCount: number;
   totalStepCount: number;
