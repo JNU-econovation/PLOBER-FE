@@ -4,7 +4,7 @@ import { ScreenRoot } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
 import type * as ExpoImagePicker from "expo-image-picker";
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -28,19 +28,12 @@ import {
   type MyPloggingStats,
   type UserProfile,
 } from "../api";
-import {
-  DEFAULT_PROFILE_CALENDAR,
-  monthlyActivityDays,
-  profileSummaryStats,
-  type CalendarMonth,
-} from "../data/profile-data";
+import { profileSummaryStats } from "../data/profile-data";
 import {
   resolveProfileImageContentType,
   uploadProfileImageToS3,
 } from "../services";
 
-const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
-const DAYS_PER_WEEK = 7;
 const MAX_EXPERIENCE_PROGRESS = 100;
 
 declare const require: <T = unknown>(moduleName: string) => T;
@@ -71,6 +64,8 @@ function getImagePickerModule() {
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const contentTopPadding =
+    Platform.OS === "ios" ? Math.max(insets.top, 12) + 8 : 8;
   const { session, status } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [ploggingStats, setPloggingStats] =
@@ -313,7 +308,7 @@ export function ProfileScreen() {
           styles.content,
           {
             paddingBottom: Math.max(insets.bottom, 24) + 118,
-            paddingTop: 8,
+            paddingTop: contentTopPadding,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -341,7 +336,6 @@ export function ProfileScreen() {
           uploadingProfileImage={uploadingProfileImage}
         />
         <SummaryStatsCard stats={ploggingStats} />
-        <ActivityCalendar />
       </ScrollView>
       <NicknameEditModal
         errorMessage={nicknameError}
@@ -622,146 +616,7 @@ function SummaryStatsCard({ stats }: { stats: MyPloggingStats | null }) {
   );
 }
 
-function ActivityCalendar() {
-  const [visibleMonth, setVisibleMonth] = useState(DEFAULT_PROFILE_CALENDAR);
-  const monthKey = formatMonthKey(visibleMonth.year, visibleMonth.month);
-  const activityDays = monthlyActivityDays[monthKey] ?? [];
-  const calendarCells = useMemo(
-    () => getCalendarCells(visibleMonth.year, visibleMonth.month),
-    [visibleMonth],
-  );
-
-  const handleChangeMonth = (offset: number) => {
-    setVisibleMonth((current) => addMonths(current, offset));
-  };
-
-  return (
-    <View style={styles.calendarCard}>
-      <View style={styles.calendarHeader}>
-        <MonthButton
-          label="이전 달"
-          name="chevron-left"
-          onPress={() => handleChangeMonth(-1)}
-        />
-        <Text selectable style={styles.calendarTitle}>
-          {visibleMonth.year}년 {visibleMonth.month + 1}월
-        </Text>
-        <MonthButton
-          label="다음 달"
-          name="chevron-right"
-          onPress={() => handleChangeMonth(1)}
-        />
-      </View>
-      <View style={styles.weekHeader}>
-        {WEEKDAYS.map((day) => (
-          <Text selectable key={day} style={styles.weekday}>
-            {day}
-          </Text>
-        ))}
-      </View>
-      <View style={styles.calendarGrid}>
-        {calendarCells.map((cell, index) => (
-          <CalendarCell
-            active={cell.day ? activityDays.includes(cell.day) : false}
-            day={cell.day}
-            inactive={!cell.day}
-            key={`${monthKey}-${index}`}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function MonthButton({
-  label,
-  name,
-  onPress,
-}: {
-  label: string;
-  name: "chevron-left" | "chevron-right";
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      hitSlop={10}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.monthButton,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <Feather color={colors.icon} name={name} size={18} />
-    </Pressable>
-  );
-}
-
-function CalendarCell({
-  active = false,
-  day,
-  inactive = false,
-}: {
-  active?: boolean;
-  day?: number;
-  inactive?: boolean;
-}) {
-  return (
-    <View style={[styles.calendarCell, inactive ? styles.calendarCellInactive : null]}>
-      {day ? (
-        <>
-          <Text selectable style={styles.dayText}>
-            {day}
-          </Text>
-          {active ? <View style={styles.activityDot} /> : null}
-        </>
-      ) : null}
-    </View>
-  );
-}
-
-function addMonths(
-  current: CalendarMonth,
-  offset: number,
-): CalendarMonth {
-  const date = new Date(current.year, current.month + offset, 1);
-
-  return {
-    month: date.getMonth(),
-    year: date.getFullYear(),
-  };
-}
-
-function getCalendarCells(year: number, month: number) {
-  const totalDays = new Date(year, month + 1, 0).getDate();
-  const firstDay = new Date(year, month, 1).getDay();
-  const prefixDays = (firstDay + 6) % DAYS_PER_WEEK;
-  const calendarDays = Array.from({ length: totalDays }, (_, index) => ({
-    day: index + 1,
-  }));
-  const cellCount = Math.ceil((prefixDays + totalDays) / DAYS_PER_WEEK) * DAYS_PER_WEEK;
-  const suffixDays = cellCount - prefixDays - totalDays;
-
-  return [
-    ...Array.from({ length: prefixDays }, () => ({ day: undefined })),
-    ...calendarDays,
-    ...Array.from({ length: suffixDays }, () => ({ day: undefined })),
-  ];
-}
-
-function formatMonthKey(year: number, month: number) {
-  return `${year}-${String(month + 1).padStart(2, "0")}`;
-}
-
 const styles = StyleSheet.create({
-  activityDot: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: 3,
-    height: 6,
-    marginTop: 13,
-    width: 6,
-  },
   avatar: {
     alignItems: "center",
     backgroundColor: "#E9FFBE",
@@ -823,56 +678,9 @@ const styles = StyleSheet.create({
     right: 5,
     width: 30,
   },
-  calendarCard: {
-    alignSelf: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    minHeight: 352,
-    paddingHorizontal: 28,
-    paddingBottom: 30,
-    paddingTop: 12,
-    width: "100%",
-    ...shadows.soft,
-  },
-  calendarCell: {
-    alignItems: "center",
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
-    height: 50,
-    paddingTop: 10,
-    width: `${100 / 7}%`,
-  },
-  calendarCellInactive: {
-    backgroundColor: "#F9F9F9",
-  },
-  calendarGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  calendarHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 13,
-  },
-  calendarTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: 0,
-    minWidth: 54,
-    textAlign: "center",
-  },
   content: {
     gap: 23,
     paddingHorizontal: 24,
-  },
-  dayText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 0,
-    lineHeight: 14,
   },
   errorText: {
     color: colors.danger,
@@ -935,12 +743,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0,
     marginBottom: 16,
-  },
-  monthButton: {
-    alignItems: "center",
-    height: 34,
-    justifyContent: "center",
-    width: 34,
   },
   nicknameErrorText: {
     color: colors.danger,
@@ -1062,17 +864,5 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "500",
     letterSpacing: 0,
-  },
-  weekHeader: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  weekday: {
-    color: colors.muted,
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 0,
-    textAlign: "center",
   },
 });
