@@ -1,2 +1,9 @@
+export { loginWithAppleToken } from "./login-with-apple-token";
 export { loginWithKakaoCode } from "./login-with-kakao-code";
-export type { KakaoLoginRequest, KakaoLoginResponse } from "./types";
+export type {
+  AppleLoginRequest,
+  AppleLoginResponse,
+  AuthLoginResponse,
+  KakaoLoginRequest,
+  KakaoLoginResponse,
+} from "./types";

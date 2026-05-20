@@ -1,4 +1,6 @@
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -11,11 +13,57 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
 
+import { useAuthSession } from "../hooks/use-auth-session";
+import { isAppleLoginCanceled } from "../services/apple-auth";
 import { buildKakaoAuthorizeUrl } from "../services/kakao-auth";
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { completeAppleLoginWithCredential } = useAuthSession();
+  const [appleLoginAvailable, setAppleLoginAvailable] = useState(false);
+  const [appleLoginSubmitting, setAppleLoginSubmitting] = useState(false);
+  const [appleLoginErrorMessage, setAppleLoginErrorMessage] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") {
+      if (__DEV__) {
+        console.log("[apple-login-screen] skip availability check", {
+          platform: Platform.OS,
+        });
+      }
+      return;
+    }
+
+    let mounted = true;
+    if (__DEV__) {
+      console.log("[apple-login-screen] availability check start");
+    }
+
+    AppleAuthentication.isAvailableAsync()
+      .then((available) => {
+        if (__DEV__) {
+          console.log("[apple-login-screen] availability check result", {
+            available,
+          });
+        }
+        if (mounted) setAppleLoginAvailable(available);
+      })
+      .catch((error) => {
+        if (__DEV__) {
+          console.log("[apple-login-screen] availability check error", {
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+        if (mounted) setAppleLoginAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLogin = () => {
     if (Platform.OS === "web") {
@@ -24,6 +72,55 @@ export function LoginScreen() {
     }
 
     router.push("/kakao-login");
+  };
+
+  const handleAppleLogin = async () => {
+    if (__DEV__) {
+      console.log("[apple-login-screen] button pressed", {
+        appleLoginAvailable,
+        appleLoginSubmitting,
+        platform: Platform.OS,
+      });
+    }
+
+    if (appleLoginSubmitting) return;
+
+    setAppleLoginSubmitting(true);
+    setAppleLoginErrorMessage(null);
+
+    try {
+      await completeAppleLoginWithCredential();
+      if (__DEV__) {
+        console.log("[apple-login-screen] login completed");
+      }
+    } catch (error) {
+      if (isAppleLoginCanceled(error)) {
+        if (__DEV__) {
+          console.log("[apple-login-screen] login canceled by user");
+        }
+        return;
+      }
+
+      if (__DEV__) {
+        console.log("[apple] login failed", {
+          message: error instanceof Error ? error.message : "unknown error",
+          name: error instanceof Error ? error.name : "unknown",
+          rawError: error,
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      }
+
+      setAppleLoginErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Apple 로그인에 실패했습니다. 잠시 후 다시 시도해주세요."
+      );
+    } finally {
+      if (__DEV__) {
+        console.log("[apple-login-screen] login flow finished");
+      }
+      setAppleLoginSubmitting(false);
+    }
   };
 
   return (
@@ -50,6 +147,23 @@ export function LoginScreen() {
         </View>
 
         <View style={styles.actionBlock}>
+          {appleLoginAvailable ? (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonStyle={
+                AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              buttonType={
+                AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+              }
+              cornerRadius={14}
+              onPress={handleAppleLogin}
+              style={[
+                styles.appleButton,
+                appleLoginSubmitting ? styles.disabled : null,
+              ]}
+            />
+          ) : null}
+
           <Pressable
             accessibilityLabel="카카오로 로그인"
             accessibilityRole="button"
@@ -63,6 +177,12 @@ export function LoginScreen() {
               카카오로 로그인
             </Text>
           </Pressable>
+
+          {appleLoginErrorMessage ? (
+            <Text selectable style={styles.errorMessage}>
+              {appleLoginErrorMessage}
+            </Text>
+          ) : null}
         </View>
       </View>
     </ScreenRoot>
@@ -73,6 +193,10 @@ const styles = StyleSheet.create({
   actionBlock: {
     gap: 14,
   },
+  appleButton: {
+    height: 58,
+    width: "100%",
+  },
   brandBlock: {
     alignItems: "center",
     flex: 1,
@@ -82,6 +206,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  disabled: {
+    opacity: 0.62,
+  },
+  errorMessage: {
+    color: colors.danger,
+    fontSize: 13,
+    lineHeight: 18,
+    paddingHorizontal: 4,
+    textAlign: "center",
   },
   kakaoButton: {
     alignItems: "center",
