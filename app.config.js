@@ -14,7 +14,7 @@ export default ({ config }) => ({
   
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.lewis.myproject",
+    bundleIdentifier: "com.econovation.plover",
     usesAppleSignIn: true,
     // iOS 위치 권한 메시지 추가
     infoPlist: {
@@ -56,7 +56,7 @@ export default ({ config }) => ({
     edgeToEdgeEnabled: true,
     usesCleartextTraffic: true,
     predictiveBackGestureEnabled: false,
-    package: "com.lewis.myproject",
+    package: "com.econovation.plover",
     // Android 권한: 포그라운드 위치 + 만보기
     permissions: [
       "ACCESS_COARSE_LOCATION",
