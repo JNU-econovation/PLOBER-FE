@@ -12,16 +12,19 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePloggingSession } from "@/src/features/plogging-session";
+import { analyzeTrashPhoto } from "@/src/features/plogging-session/services/analyze-trash-photo";
+import { capturePloggingPhoto } from "@/src/features/plogging-session/services/capture-plogging-photo";
 import {
   getToiletTintColor,
   getTrashBinTintColor,
   useNearbyToilets,
   useNearbyTrashBins,
 } from "@/src/features/public-facilities";
+import { useDeviceLocation } from "@/src/shared/location";
 
 // 시작 버튼 + 위/아래 같은 간격(41px)까지는 솔리드, 그 위로는 페이드
 const START_BUTTON_HEIGHT = 96;
@@ -42,7 +45,9 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<PloggingMode>("ai");
   const [timeMinutes, setTimeMinutes] = useState<number>(DEFAULT_TIME_MINUTES);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const [restroomVisible, setRestroomVisible] = useState(false);
+  const { position } = useDeviceLocation();
   const { setMode: setSessionMode } = usePloggingSession();
   const trashBinsState = useNearbyTrashBins();
   const toiletsState = useNearbyToilets({ enabled: restroomVisible });
@@ -80,6 +85,32 @@ export function HomeScreen() {
       pathname: "/ai-route",
       params: { time: String(timeMinutes) },
     });
+  };
+
+  const handleTrashReport = async () => {
+    if (reportSubmitting) return;
+
+    const result = await capturePloggingPhoto();
+    if (result.status !== "captured") return;
+
+    setReportSubmitting(true);
+    try {
+      const analysisResult = await analyzeTrashPhoto({
+        contentType: "image/jpeg",
+        latitude: position?.latitude,
+        localUri: result.uri,
+        longitude: position?.longitude,
+      });
+
+      if (analysisResult.status === "accepted") {
+        Alert.alert("제보 완료", "쓰레기 사진 제보가 접수되었습니다.");
+        return;
+      }
+
+      Alert.alert("제보 실패", analysisResult.message);
+    } finally {
+      setReportSubmitting(false);
+    }
   };
 
   const tabBarHeight = useTabBarHeight();
@@ -155,9 +186,11 @@ export function HomeScreen() {
           쓰레기 제보
         </Text>
         <Pressable
-          accessibilityLabel="쓰레기 제보"
+          accessibilityLabel={reportSubmitting ? "쓰레기 제보 중" : "쓰레기 제보"}
           accessibilityRole="button"
+          accessibilityState={{ busy: reportSubmitting }}
           hitSlop={8}
+          onPress={handleTrashReport}
           style={({ pressed }) => [
             styles.reportButton,
             { bottom: tabBarHeight + reportButtonOffset },
