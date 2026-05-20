@@ -19,7 +19,21 @@ const segments = [
   { width: 72, left: 96, top: 218, rotate: "6deg" },
 ] as const;
 
-export function RouteSketch({ compact = false, pin = true }: RouteSketchProps) {
+const arrowMarkers = [
+  { left: 54, top: 212, rotate: "0deg" },
+  { left: 88, top: 212, rotate: "0deg" },
+  { left: 58, top: 160, rotate: "-86deg" },
+  { left: 66, top: 132, rotate: "-8deg" },
+  { left: 106, top: 101, rotate: "-42deg" },
+  { left: 150, top: 84, rotate: "-8deg" },
+  { left: 188, top: 121, rotate: "72deg" },
+  { left: 190, top: 158, rotate: "4deg" },
+  { left: 162, top: 196, rotate: "45deg" },
+  { left: 110, top: 218, rotate: "6deg" },
+  { left: 140, top: 220, rotate: "6deg" },
+] as const;
+
+export function RouteSketch({ compact = false }: RouteSketchProps) {
   return (
     <View style={[styles.container, compact ? styles.compact : null]}>
       {segments.map((segment, index) => (
@@ -36,11 +50,21 @@ export function RouteSketch({ compact = false, pin = true }: RouteSketchProps) {
           ]}
         />
       ))}
-      {pin ? (
-        <View style={styles.pin}>
-          <View style={styles.pinInner} />
+      {arrowMarkers.map((marker, index) => (
+        <View
+          key={`${marker.left}-${marker.top}-${index}`}
+          style={[
+            styles.arrowMarker,
+            {
+              left: marker.left,
+              top: marker.top,
+              transform: [{ rotate: marker.rotate }],
+            },
+          ]}
+        >
+          <View style={styles.arrowHead} />
         </View>
-      ) : null}
+      ))}
     </View>
   );
 }
@@ -55,26 +79,28 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.92 }],
   },
   segment: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
     borderRadius: 8,
-    height: 8,
+    height: 9,
     position: "absolute",
   },
-  pin: {
+  arrowHead: {
+    borderBottomColor: colors.surface,
+    borderBottomWidth: 10,
+    borderLeftColor: "transparent",
+    borderLeftWidth: 4,
+    borderRightColor: "transparent",
+    borderRightWidth: 4,
+    height: 0,
+    width: 0,
+  },
+  arrowMarker: {
     alignItems: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 28,
-    height: 56,
+    backgroundColor: "transparent",
+    height: 16,
     justifyContent: "center",
-    left: 204,
+    opacity: 0.92,
     position: "absolute",
-    top: 156,
-    width: 56,
-  },
-  pinInner: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    height: 24,
-    width: 24,
+    width: 16,
   },
 });

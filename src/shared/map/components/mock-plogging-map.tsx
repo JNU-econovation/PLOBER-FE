@@ -2,12 +2,16 @@ import { StyleSheet, Text, View, type TextStyle, type ViewStyle } from "react-na
 
 import { MOCK_MAP_LABELS } from "../data/map-data";
 import { colors } from "../../theme";
+import { HeatmapLegend } from "./heatmap-legend";
 import { RouteSketch } from "./route-sketch";
 import type { PloggingMapProps } from "./types";
 
 export function MockPloggingMap({
   children,
   routeVisible = false,
+  heatmapVisible = false,
+  heatmapLegendVisible = heatmapVisible,
+  heatmapLegendTop,
   dimmed = false,
   style,
 }: PloggingMapProps) {
@@ -31,13 +35,25 @@ export function MockPloggingMap({
         ))}
         <View style={styles.currentDot} />
       </View>
+      {heatmapVisible ? <MockHeatmap /> : null}
       {routeVisible ? (
         <View style={styles.routeLayer}>
           <RouteSketch compact />
         </View>
       ) : null}
       {dimmed ? <View style={styles.dimmed} /> : null}
+      {heatmapLegendVisible ? <HeatmapLegend top={heatmapLegendTop} /> : null}
       {children}
+    </View>
+  );
+}
+
+function MockHeatmap() {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={[styles.hotspot, styles.hotspotStrong]} />
+      <View style={[styles.hotspot, styles.hotspotMedium]} />
+      <View style={[styles.hotspot, styles.hotspotSoft]} />
     </View>
   );
 }
@@ -54,6 +70,10 @@ const styles = StyleSheet.create<{
   parkTwo: ViewStyle;
   water: ViewStyle;
   currentDot: ViewStyle;
+  hotspot: ViewStyle;
+  hotspotStrong: ViewStyle;
+  hotspotMedium: ViewStyle;
+  hotspotSoft: ViewStyle;
   mapLabel: TextStyle;
   routeLayer: ViewStyle;
   dimmed: ViewStyle;
@@ -128,6 +148,31 @@ const styles = StyleSheet.create<{
     position: "absolute",
     top: "41%",
     width: 22,
+  },
+  hotspot: {
+    borderRadius: 999,
+    position: "absolute",
+  },
+  hotspotMedium: {
+    backgroundColor: "rgba(249, 115, 22, 0.34)",
+    height: 112,
+    right: 34,
+    top: "35%",
+    width: 112,
+  },
+  hotspotSoft: {
+    backgroundColor: "rgba(234, 179, 8, 0.28)",
+    height: 96,
+    right: 102,
+    top: "23%",
+    width: 96,
+  },
+  hotspotStrong: {
+    backgroundColor: "rgba(239, 68, 68, 0.46)",
+    height: 128,
+    left: 28,
+    top: "47%",
+    width: 128,
   },
   mapLabel: {
     color: "#A2785C",

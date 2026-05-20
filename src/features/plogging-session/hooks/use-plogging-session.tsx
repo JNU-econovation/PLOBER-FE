@@ -19,6 +19,7 @@ type PloggingSessionContextValue = {
   photoUris: string[];
   // 로컬 URI → S3 objectUrl 매핑. 업로드 성공한 사진만 키로 존재한다.
   photoObjectUrls: Record<string, string>;
+  recommendedRoutePoints: RoutePoint[];
   routePoints: RoutePoint[];
   distanceMeters: number;
   stepCount: number;
@@ -38,10 +39,11 @@ type PloggingSessionContextValue = {
   addPhotoObjectUrl: (localUri: string, objectUrl: string) => void;
   appendRoutePoint: (point: RoutePoint) => void;
   addSteps: (delta: number) => void;
+  setRecommendedRoutePoints: (points: RoutePoint[]) => void;
   setPlaceName: (name: string) => void;
   setMapImageUri: (uri: string | null) => void;
   setMapImageObjectUrl: (url: string | null) => void;
-  resetSession: () => void;
+  resetSession: (options?: { preserveRecommendedRoute?: boolean }) => void;
 };
 
 const PloggingSessionContext =
@@ -56,6 +58,9 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
   const [photoObjectUrls, setPhotoObjectUrls] = useState<
     Record<string, string>
   >({});
+  const [recommendedRoutePoints, setRecommendedRoutePointsState] = useState<
+    RoutePoint[]
+  >([]);
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>([]);
   const [distanceMeters, setDistanceMeters] = useState(0);
   const [stepCount, setStepCount] = useState(0);
@@ -113,6 +118,10 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     setStepCount((prev) => prev + delta);
   }, []);
 
+  const setRecommendedRoutePoints = useCallback((points: RoutePoint[]) => {
+    setRecommendedRoutePointsState(points);
+  }, []);
+
   const setPlaceName = useCallback((name: string) => {
     setPlaceNameState(name);
   }, []);
@@ -141,21 +150,27 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     setRestSeconds(Math.max(0, Math.floor(nextRestSeconds)));
   }, []);
 
-  const resetSession = useCallback(() => {
-    setPhotoUris([]);
-    setPhotoObjectUrls({});
-    setRoutePoints([]);
-    setDistanceMeters(0);
-    setStepCount(0);
-    setStartCoord(null);
-    setEndCoord(null);
-    setPlaceNameState("");
-    setMapImageUriState(null);
-    setMapImageObjectUrlState(null);
-    setStartedAtMs(null);
-    setFinishedAtMs(null);
-    setRestSeconds(0);
-  }, []);
+  const resetSession = useCallback(
+    (options?: { preserveRecommendedRoute?: boolean }) => {
+      setPhotoUris([]);
+      setPhotoObjectUrls({});
+      if (!options?.preserveRecommendedRoute) {
+        setRecommendedRoutePointsState([]);
+      }
+      setRoutePoints([]);
+      setDistanceMeters(0);
+      setStepCount(0);
+      setStartCoord(null);
+      setEndCoord(null);
+      setPlaceNameState("");
+      setMapImageUriState(null);
+      setMapImageObjectUrlState(null);
+      setStartedAtMs(null);
+      setFinishedAtMs(null);
+      setRestSeconds(0);
+    },
+    []
+  );
 
   const value = useMemo<PloggingSessionContextValue>(
     () => ({
@@ -174,6 +189,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       photoObjectUrls,
       photoUris,
       placeName,
+      recommendedRoutePoints,
       removePhoto,
       resetSession,
       restSeconds,
@@ -182,6 +198,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       setMapImageUri,
       setMode,
       setPlaceName,
+      setRecommendedRoutePoints,
       startCoord,
       startedAtMs,
       startSession,
@@ -202,6 +219,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       photoObjectUrls,
       photoUris,
       placeName,
+      recommendedRoutePoints,
       removePhoto,
       resetSession,
       restSeconds,
@@ -210,6 +228,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       setMapImageUri,
       setMode,
       setPlaceName,
+      setRecommendedRoutePoints,
       startCoord,
       startedAtMs,
       startSession,

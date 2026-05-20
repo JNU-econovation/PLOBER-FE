@@ -1,20 +1,15 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import type { ComponentProps } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   StyleSheet,
   Text,
   View,
-  type ImageStyle,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 
 import { colors, shadows, typography } from "../theme";
-
-type IconSource = ComponentProps<typeof Image>["source"];
-
-const cameraIcon: IconSource = require("@/assets/icons/camera-report.png");
 
 export function StatNumber({
   value,
@@ -38,6 +33,62 @@ export function StatNumber({
       {value}
       {unit ? <Text style={styles.statUnit}> {unit}</Text> : null}
     </Text>
+  );
+}
+
+export function CenterToast({
+  message,
+  visible,
+}: {
+  message: string;
+  visible: boolean;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.96)).current;
+  const [rendered, setRendered] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setRendered(true);
+    }
+
+    Animated.parallel([
+      Animated.timing(opacity, {
+        duration: visible ? 140 : 180,
+        toValue: visible ? 1 : 0,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        duration: visible ? 140 : 180,
+        toValue: visible ? 1 : 0.96,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished && !visible) {
+        setRendered(false);
+      }
+    });
+  }, [opacity, scale, visible]);
+
+  if (!rendered) return null;
+
+  return (
+    <View pointerEvents="none" style={styles.centerToastOverlay}>
+      <Animated.View
+        accessibilityLiveRegion="polite"
+        style={[
+          styles.centerToast,
+          {
+            opacity,
+            transform: [{ scale }],
+          },
+        ]}
+      >
+        <Text selectable style={styles.centerToastText}>
+          {message}
+        </Text>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -70,10 +121,10 @@ export function MiniGlyph({
 export function CameraGlyph({ light: _light = false }: { light?: boolean }) {
   return (
     <View style={styles.cameraGlyph}>
-      <Image
-        contentFit="contain"
-        source={cameraIcon}
-        style={styles.cameraIcon}
+      <MaterialCommunityIcons
+        color={colors.icon}
+        name="camera"
+        size={34}
       />
     </View>
   );
@@ -108,6 +159,9 @@ export function PlayGlyph() {
 const styles = StyleSheet.create<{
   statNumber: TextStyle;
   statUnit: TextStyle;
+  centerToastOverlay: ViewStyle;
+  centerToast: ViewStyle;
+  centerToastText: TextStyle;
   faceTile: ViewStyle;
   faceLeaf: ViewStyle;
   faceLeafOne: ViewStyle;
@@ -117,7 +171,6 @@ const styles = StyleSheet.create<{
   miniGlyphWrap: ViewStyle;
   miniGlyph: ViewStyle;
   cameraGlyph: ViewStyle;
-  cameraIcon: ImageStyle;
   levelBadge: ViewStyle;
   levelBadgeText: TextStyle;
   routePin: ViewStyle;
@@ -135,6 +188,31 @@ const styles = StyleSheet.create<{
     color: "#616161",
     fontSize: 12,
     fontWeight: "500",
+  },
+  centerToastOverlay: {
+    alignItems: "center",
+    bottom: 0,
+    justifyContent: "center",
+    left: 24,
+    position: "absolute",
+    right: 24,
+    top: 0,
+    zIndex: 50,
+  },
+  centerToast: {
+    backgroundColor: "rgba(28, 31, 39, 0.9)",
+    borderRadius: 18,
+    maxWidth: 320,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    ...shadows.soft,
+  },
+  centerToastText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: 0,
+    textAlign: "center",
   },
   faceTile: {
     alignItems: "center",
@@ -200,10 +278,6 @@ const styles = StyleSheet.create<{
     justifyContent: "center",
     width: 52,
     ...shadows.soft,
-  },
-  cameraIcon: {
-    height: 34,
-    width: 34,
   },
   levelBadge: {
     alignItems: "center",

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   NaverMapMarkerOverlay,
@@ -13,6 +13,11 @@ import { colors } from "../../theme";
 import { CAMPUS_CAMERA, ROUTE_COORDS } from "../data/map-data";
 import { useHotspotPolygons } from "../hooks/use-hotspot-polygons";
 import { getHotspotColor } from "../services/hotspot-tiles";
+import {
+  buildRouteGuideMarkers,
+  type RouteGuideMarkers,
+} from "../services/route-guides";
+import { HeatmapLegend } from "./heatmap-legend";
 import type { PloggingMapProps } from "./types";
 
 // 이 이상 좌표가 변할 때만 카메라를 다시 애니메이션한다(약 22m).
@@ -24,6 +29,8 @@ export function PloggingMap({
   routeVisible = false,
   routePoints,
   heatmapVisible = false,
+  heatmapLegendVisible = heatmapVisible,
+  heatmapLegendTop,
   dimmed = false,
   style,
   zoom,
@@ -38,6 +45,10 @@ export function PloggingMap({
   const hotspots = useHotspotPolygons(heatmapVisible);
   const visibleRoutePoints =
     routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
+  const routeGuides = useMemo(
+    () => buildRouteGuideMarkers(visibleRoutePoints),
+    [visibleRoutePoints]
+  );
 
   // 최초 카메라는 mount 시점 공유 위치(없으면 CAMPUS_CAMERA fallback).
   // 이후 위치 변경은 animateCameraTo로 부드럽게 이동시킨다.
@@ -79,14 +90,13 @@ export function PloggingMap({
     mapRef.current?.animateCameraTo({
       latitude: positionLatitude,
       longitude: positionLongitude,
-      zoom: zoom ?? CAMPUS_CAMERA.zoom,
       duration: 500,
     });
     lastAnimatedRef.current = {
       latitude: positionLatitude,
       longitude: positionLongitude,
     };
-  }, [followUserLocation, positionLatitude, positionLongitude, zoom]);
+  }, [followUserLocation, positionLatitude, positionLongitude]);
 
   const handleInitialized = () => {
     if (__DEV__) {
@@ -118,6 +128,8 @@ export function PloggingMap({
                       longitude: positionLongitude,
                     }
                   : undefined,
+                anchor: { x: 0.5, y: 0.5 },
+                subAnchor: { x: 0.5, y: 0.5 },
               }
             : undefined
         }
@@ -161,12 +173,15 @@ export function PloggingMap({
             ))
           : null}
         {routeVisible ? (
-          <NaverMapPolylineOverlay
-            color={colors.primary}
-            coords={visibleRoutePoints}
-            zIndex={2}
-            width={8}
-          />
+          <>
+            <NaverMapPolylineOverlay
+              color={colors.primaryDark}
+              coords={visibleRoutePoints}
+              zIndex={2}
+              width={9}
+            />
+            <RouteGuideOverlays guides={routeGuides} />
+          </>
         ) : null}
         {trashBins?.map((bin) => (
           <NaverMapMarkerOverlay
@@ -174,6 +189,7 @@ export function PloggingMap({
             latitude={bin.latitude}
             longitude={bin.longitude}
             tintColor={bin.tintColor}
+            zIndex={6}
           />
         ))}
         {toilets?.map((toilet) => (
@@ -182,12 +198,43 @@ export function PloggingMap({
             latitude={toilet.latitude}
             longitude={toilet.longitude}
             tintColor={toilet.tintColor}
+            zIndex={6}
           />
         ))}
       </NaverMapView>
       {dimmed ? <View style={styles.dimmed} /> : null}
+      {heatmapLegendVisible ? <HeatmapLegend top={heatmapLegendTop} /> : null}
       {children}
     </View>
+  );
+}
+
+function RouteGuideOverlays({ guides }: { guides: RouteGuideMarkers }) {
+  return (
+    <>
+      {guides.arrows.map((marker) => (
+        <NaverMapMarkerOverlay
+          key={marker.id}
+          anchor={{ x: 0.5, y: 0.5 }}
+          angle={marker.bearing}
+          height={16}
+          isFlatEnabled
+          isForceShowIcon
+          latitude={marker.latitude}
+          longitude={marker.longitude}
+          width={16}
+          zIndex={3}
+        >
+          <View
+            key={`${marker.id}-${Math.round(marker.bearing)}`}
+            collapsable={false}
+            style={styles.routeArrowMarker}
+          >
+            <View style={styles.routeArrowHead} />
+          </View>
+        </NaverMapMarkerOverlay>
+      ))}
+    </>
   );
 }
 
@@ -200,5 +247,23 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255, 255, 255, 0.50)",
     pointerEvents: "none",
+  },
+  routeArrowHead: {
+    borderBottomColor: colors.surface,
+    borderBottomWidth: 10,
+    borderLeftColor: "transparent",
+    borderLeftWidth: 4,
+    borderRightColor: "transparent",
+    borderRightWidth: 4,
+    height: 0,
+    width: 0,
+  },
+  routeArrowMarker: {
+    alignItems: "center",
+    backgroundColor: "transparent",
+    height: 16,
+    justifyContent: "center",
+    opacity: 0.92,
+    width: 16,
   },
 });
