@@ -11,7 +11,7 @@
 ## iOS Configuration
 
 - `eas.json` now includes `development`, `preview`, and `production` build profiles.
-- The current iOS bundle identifier remains `com.lewis.myproject`.
+- The current iOS bundle identifier is `com.econovation.plover`.
 - Apple Sign In is enabled through `usesAppleSignIn`.
 - Camera, photo library, location, and motion usage descriptions are configured in `app.config.js`.
 - App Transport Security exceptions include the backend API host and hotspot tile host because both are currently HTTP endpoints.
@@ -45,9 +45,9 @@ npx eas-cli@latest submit -p ios --profile production
 
 ## Remaining Manual Release Tasks
 
-- Create or confirm the App Store Connect app record for bundle ID `com.lewis.myproject`.
+- Create or confirm the App Store Connect app record for bundle ID `com.econovation.plover`.
 - Configure Apple Developer team credentials with `npx eas-cli@latest credentials -p ios`.
 - Add App Store metadata: app name, subtitle, description, keywords, support URL, privacy policy URL, screenshots, and age rating.
 - Complete App Privacy details for location, photos, camera, motion, authentication, and any analytics actually used.
 - Test the HTTP API endpoints on a physical iPhone build because ATS exceptions and native map overlays cannot be fully validated in web.
-- Replace the temporary bundle identifier before public release if `com.lewis.myproject` is not the final production identifier.
+- Confirm `com.econovation.plover` is the final production bundle identifier before public release.
