@@ -33,6 +33,8 @@ export function PloggingMap({
 }: PloggingMapProps) {
   const mapRef = useRef<NaverMapViewRef>(null);
   const { position } = useDeviceLocation();
+  const positionLatitude = position?.latitude;
+  const positionLongitude = position?.longitude;
   const hotspots = useHotspotPolygons(heatmapVisible);
   const visibleRoutePoints =
     routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
@@ -59,26 +61,32 @@ export function PloggingMap({
   };
 
   useEffect(() => {
-    if (!followUserLocation || !position) return;
+    if (
+      !followUserLocation ||
+      typeof positionLatitude !== "number" ||
+      typeof positionLongitude !== "number"
+    ) {
+      return;
+    }
     const prev = lastAnimatedRef.current;
     if (prev) {
-      const dLat = Math.abs(position.latitude - prev.latitude);
-      const dLng = Math.abs(position.longitude - prev.longitude);
+      const dLat = Math.abs(positionLatitude - prev.latitude);
+      const dLng = Math.abs(positionLongitude - prev.longitude);
       if (dLat < CAMERA_ANIMATE_THRESHOLD && dLng < CAMERA_ANIMATE_THRESHOLD) {
         return;
       }
     }
     mapRef.current?.animateCameraTo({
-      latitude: position.latitude,
-      longitude: position.longitude,
+      latitude: positionLatitude,
+      longitude: positionLongitude,
       zoom: zoom ?? CAMPUS_CAMERA.zoom,
       duration: 500,
     });
     lastAnimatedRef.current = {
-      latitude: position.latitude,
-      longitude: position.longitude,
+      latitude: positionLatitude,
+      longitude: positionLongitude,
     };
-  }, [followUserLocation, position?.latitude, position?.longitude, zoom]);
+  }, [followUserLocation, positionLatitude, positionLongitude, zoom]);
 
   const handleInitialized = () => {
     if (__DEV__) {
@@ -97,7 +105,21 @@ export function PloggingMap({
         isShowLocationButton={false}
         isShowZoomControls={false}
         locationOverlay={
-          followUserLocation ? { isVisible: true } : undefined
+          followUserLocation
+            ? {
+                isVisible:
+                  typeof positionLatitude === "number" &&
+                  typeof positionLongitude === "number",
+                position:
+                  typeof positionLatitude === "number" &&
+                  typeof positionLongitude === "number"
+                  ? {
+                      latitude: positionLatitude,
+                      longitude: positionLongitude,
+                    }
+                  : undefined,
+              }
+            : undefined
         }
         onCameraChanged={
           __DEV__
