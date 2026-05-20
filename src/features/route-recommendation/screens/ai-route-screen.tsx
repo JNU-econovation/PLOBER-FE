@@ -88,7 +88,7 @@ export function AiRouteScreen() {
         </ScrollView>
         <PrimaryBottomButton
           onPress={() => {
-            setSessionMode("AI");
+            setSessionMode("RECOMMENDED");
             router.push({
               pathname: "/plogging",
               params: { routeId: selectedRouteId },

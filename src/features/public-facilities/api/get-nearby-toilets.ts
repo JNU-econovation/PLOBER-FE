@@ -5,7 +5,7 @@ import type {
   GetNearbyToiletsResponse,
 } from "./types";
 
-const NEARBY_TOILETS_PATH = "/api/public-facilities/toilets";
+const NEARBY_TOILETS_PATH = "/api/facilities/toilets";
 
 export async function getNearbyToilets(
   params: GetNearbyToiletsRequest

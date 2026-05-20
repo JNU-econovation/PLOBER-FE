@@ -55,8 +55,8 @@ export function useNearbyTrashBins(): NearbyTrashBinsState {
     setState({ status: "loading" });
 
     getNearbyTrashBins({
-      latitude: position.latitude,
-      longitude: position.longitude,
+      lat: position.latitude,
+      lng: position.longitude,
     })
       .then((trashBins) => {
         if (!mounted) return;

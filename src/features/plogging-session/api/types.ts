@@ -1,4 +1,4 @@
-export type PloggingMode = "FREE" | "AI";
+export type PloggingMode = "FREE" | "RECOMMENDED";
 
 export type RoutePoint = {
   latitude: number;

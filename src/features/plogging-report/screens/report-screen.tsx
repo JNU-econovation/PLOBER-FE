@@ -84,7 +84,7 @@ export function ReportScreen() {
     startedAtMs !== null && finishedAtMs !== null
       ? `${formatHm(startedAtMs)} → ${formatHm(finishedAtMs)}`
       : "";
-  const modeLabel = mode === "AI" ? "AI 추천 · 완료" : "자유모드 · 완료";
+  const modeLabel = mode === "RECOMMENDED" ? "AI 추천 · 완료" : "자유모드 · 완료";
   const distanceKm = formatKilometers(distanceMeters);
   const ploggingSecondsForView =
     startedAtMs !== null && finishedAtMs !== null

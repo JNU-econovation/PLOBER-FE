@@ -15,8 +15,8 @@ export type TrashBin = {
 };
 
 export type GetNearbyTrashBinsRequest = {
-  latitude: number;
-  longitude: number;
+  lat: number;
+  lng: number;
 };
 
 export type GetNearbyTrashBinsResponse = TrashBin[];
@@ -38,8 +38,8 @@ export type Toilet = {
 };
 
 export type GetNearbyToiletsRequest = {
-  latitude: number;
-  longitude: number;
+  lat: number;
+  lng: number;
 };
 
 export type GetNearbyToiletsResponse = Toilet[];

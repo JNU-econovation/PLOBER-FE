@@ -85,7 +85,7 @@ function DetailBody({ detail }: { detail: PloggingSessionDetail }) {
   const validDates =
     !Number.isNaN(startedAt.getTime()) && !Number.isNaN(finishedAt.getTime());
 
-  const modeLabel = detail.mode === "AI" ? "AI 추천 · 완료" : "자유모드 · 완료";
+  const modeLabel = detail.mode === "RECOMMENDED" ? "AI 추천 · 완료" : "자유모드 · 완료";
   const titleDate = validDates
     ? `${startedAt.getMonth() + 1}월 ${startedAt.getDate()}일`
     : "";

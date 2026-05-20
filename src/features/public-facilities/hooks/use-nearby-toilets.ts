@@ -70,8 +70,8 @@ export function useNearbyToilets({ enabled }: UseNearbyToiletsOptions): NearbyTo
     setState({ status: "loading" });
 
     getNearbyToilets({
-      latitude: position.latitude,
-      longitude: position.longitude,
+      lat: position.latitude,
+      lng: position.longitude,
     })
       .then((toilets) => {
         if (!mounted) return;

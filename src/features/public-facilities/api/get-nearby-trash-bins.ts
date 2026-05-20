@@ -5,7 +5,7 @@ import type {
   GetNearbyTrashBinsResponse,
 } from "./types";
 
-const NEARBY_TRASH_BINS_PATH = "/api/public-facilities/trash-bins";
+const NEARBY_TRASH_BINS_PATH = "/api/facilities/trash-bins";
 
 export async function getNearbyTrashBins(
   params: GetNearbyTrashBinsRequest
