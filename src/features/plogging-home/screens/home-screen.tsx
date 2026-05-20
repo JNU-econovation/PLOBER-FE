@@ -6,6 +6,7 @@ import {
   ModeSwitch,
   ScreenRoot,
   TimeStepper,
+  CenterToast,
   useTabBarHeight,
   type PloggingMode,
 } from "@/src/shared/ui";
@@ -19,9 +20,8 @@ import { usePloggingSession } from "@/src/features/plogging-session";
 import { analyzeTrashPhoto } from "@/src/features/plogging-session/services/analyze-trash-photo";
 import { capturePloggingPhoto } from "@/src/features/plogging-session/services/capture-plogging-photo";
 import {
-  getToiletTintColor,
   getTrashBinTintColor,
-  useNearbyToilets,
+  useRestroomToggle,
   useNearbyTrashBins,
 } from "@/src/features/public-facilities";
 import { useDeviceLocation } from "@/src/shared/location";
@@ -39,6 +39,7 @@ const DEFAULT_TIME_MINUTES = 30;
 const MIN_TIME_MINUTES = 10;
 const MAX_TIME_MINUTES = 120;
 const TIME_STEP_MINUTES = 5;
+const HEATMAP_LEGEND_TOP_OFFSET = 132;
 
 export function HomeScreen() {
   const router = useRouter();
@@ -46,11 +47,20 @@ export function HomeScreen() {
   const [mode, setMode] = useState<PloggingMode>("ai");
   const [timeMinutes, setTimeMinutes] = useState<number>(DEFAULT_TIME_MINUTES);
   const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [restroomVisible, setRestroomVisible] = useState(false);
+  const [heatmapVisible, setHeatmapVisible] = useState(false);
   const { position } = useDeviceLocation();
-  const { setMode: setSessionMode } = usePloggingSession();
+  const {
+    setMode: setSessionMode,
+    setRecommendedRoutePoints,
+  } = usePloggingSession();
   const trashBinsState = useNearbyTrashBins();
-  const toiletsState = useNearbyToilets({ enabled: restroomVisible });
+  const {
+    noNearbyToiletsMessage,
+    noNearbyToiletsNoticeVisible,
+    restroomVisible,
+    toggleRestroom,
+    toiletMarkers,
+  } = useRestroomToggle();
   const trashBinMarkers =
     trashBinsState.status === "success"
       ? trashBinsState.trashBins.map((bin) => ({
@@ -60,21 +70,13 @@ export function HomeScreen() {
           tintColor: getTrashBinTintColor(bin.trashType),
         }))
       : undefined;
-  const toiletMarkers =
-    restroomVisible && toiletsState.status === "success"
-      ? toiletsState.toilets.map((toilet) => ({
-          id: toilet.id,
-          latitude: toilet.latitude,
-          longitude: toilet.longitude,
-          tintColor: getToiletTintColor(toilet.openTimeType),
-        }))
-      : undefined;
 
   const handleStart = () => {
     // 자유모드는 바로 플로깅 시작하므로 여기서 세션 mode를 확정한다.
     // AI 모드는 ai-route 화면에서 경로 선택 후에 확정된다.
     if (mode === "free") {
       setSessionMode("FREE");
+      setRecommendedRoutePoints([]);
       router.push("/plogging");
       return;
     }
@@ -140,12 +142,24 @@ export function HomeScreen() {
 
   return (
     <ScreenRoot>
-      <PloggingMap dimmed toilets={toiletMarkers} trashBins={trashBinMarkers}>
+      <PloggingMap
+        dimmed
+        heatmapLegendTop={Math.max(insets.top, 44) + HEATMAP_LEGEND_TOP_OFFSET}
+        heatmapVisible={heatmapVisible}
+        toilets={toiletMarkers}
+        trashBins={trashBinMarkers}
+      >
         <ModeSwitch onChange={setMode} value={mode} />
         <MapControls
-          onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
+          heatmapActive={heatmapVisible}
+          onToggleHeatmap={() => setHeatmapVisible((prev) => !prev)}
+          onToggleRestroom={toggleRestroom}
           restroomActive={restroomVisible}
           top={Math.max(insets.top, 44) + 80}
+        />
+        <CenterToast
+          message={noNearbyToiletsMessage}
+          visible={noNearbyToiletsNoticeVisible}
         />
 
         <LinearGradient

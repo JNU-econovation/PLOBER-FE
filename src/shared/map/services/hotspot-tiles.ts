@@ -8,6 +8,7 @@ const HOTSPOT_TILE_URL =
 const HOTSPOT_SOURCE_LAYER = "predicted_hotspots";
 const HOTSPOT_ZOOM = 14;
 const MAX_POLYGONS_PER_TILE = 160;
+const NEIGHBOR_TILE_OFFSETS = [-1, 0, 1] as const;
 
 type TileCoordinate = {
   z: number;
@@ -35,7 +36,18 @@ export async function getHotspotPolygonsNear(point: {
   longitude: number;
 }): Promise<HotspotPolygon[]> {
   const center = lonLatToTile(point.longitude, point.latitude, HOTSPOT_ZOOM);
-  return getHotspotPolygonsForTile(center);
+  const tiles = getNeighborTiles(center);
+  const tilePolygons = await Promise.all(tiles.map(getHotspotPolygonsForTile));
+
+  return tilePolygons.flat();
+}
+
+export function getHotspotTileKey(point: {
+  latitude: number;
+  longitude: number;
+}): string {
+  const center = lonLatToTile(point.longitude, point.latitude, HOTSPOT_ZOOM);
+  return `${center.z}:${center.x}:${center.y}`;
 }
 
 async function getHotspotPolygonsForTile(
@@ -113,6 +125,23 @@ function lonLatToTile(
   };
 }
 
+function getNeighborTiles(center: TileCoordinate): TileCoordinate[] {
+  const scale = 2 ** center.z;
+  const maxY = scale - 1;
+
+  return NEIGHBOR_TILE_OFFSETS.flatMap((dy) =>
+    NEIGHBOR_TILE_OFFSETS.map((dx) => ({
+      z: center.z,
+      x: wrapTileX(center.x + dx, scale),
+      y: clamp(center.y + dy, 0, maxY),
+    }))
+  );
+}
+
+function wrapTileX(x: number, scale: number): number {
+  return ((x % scale) + scale) % scale;
+}
+
 function getOuterRings(
   geometry: GeoJsonFeature["geometry"]
 ): number[][][] {
@@ -128,7 +157,7 @@ function getOuterRings(
 function getTrashScore(properties: Record<string, unknown> | undefined): number {
   const value = properties?.trash_score;
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
-  return Math.max(0, Math.min(1, value));
+  return clamp(value, 0, 1);
 }
 
 function isValidCoord(coord: {
@@ -144,9 +173,13 @@ function isValidCoord(coord: {
 }
 
 export function getHotspotColor(trashScore: number): string {
-  if (trashScore >= 0.8) return "rgba(185, 28, 28, 0.58)";
-  if (trashScore >= 0.6) return "rgba(239, 68, 68, 0.46)";
-  if (trashScore >= 0.3) return "rgba(249, 115, 22, 0.34)";
-  if (trashScore > 0) return "rgba(234, 179, 8, 0.24)";
-  return "rgba(34, 197, 94, 0.12)";
+  if (trashScore >= 0.8) return "rgba(185, 28, 28, 0.90)";
+  if (trashScore >= 0.6) return "rgba(239, 68, 68, 0.70)";
+  if (trashScore >= 0.3) return "rgba(249, 115, 22, 0.50)";
+  if (trashScore > 0) return "rgba(234, 179, 8, 0.30)";
+  return "rgba(34, 197, 94, 0.05)";
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

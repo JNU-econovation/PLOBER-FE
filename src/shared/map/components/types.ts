@@ -25,6 +25,8 @@ export type PloggingMapProps = PropsWithChildren<{
   routeVisible?: boolean;
   routePoints?: { latitude: number; longitude: number }[];
   heatmapVisible?: boolean;
+  heatmapLegendVisible?: boolean;
+  heatmapLegendTop?: number;
   dimmed?: boolean;
   style?: StyleProp<ViewStyle>;
   /**

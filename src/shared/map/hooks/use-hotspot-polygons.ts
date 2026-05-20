@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { useDeviceLocation } from "@/src/shared/location";
 
 import type { HotspotPolygon } from "../components/types";
-import { getHotspotPolygonsNear } from "../services/hotspot-tiles";
+import {
+  getHotspotPolygonsNear,
+  getHotspotTileKey,
+} from "../services/hotspot-tiles";
 
 type HotspotPolygonsState =
   | { status: "idle" | "loading"; polygons: HotspotPolygon[] }
@@ -37,7 +40,7 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
       return;
     }
 
-    const key = `${position.latitude.toFixed(2)},${position.longitude.toFixed(2)}`;
+    const key = getHotspotTileKey(position);
     if (fetchedKeyRef.current === key) return;
     fetchedKeyRef.current = key;
 

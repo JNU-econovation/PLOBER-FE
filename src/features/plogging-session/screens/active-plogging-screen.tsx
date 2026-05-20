@@ -3,15 +3,13 @@ import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context"; // 🌟 추가
 import { useAuthSession } from "@/src/features/auth";
-import {
-  getToiletTintColor,
-  useNearbyToilets,
-} from "@/src/features/public-facilities";
+import { useRestroomToggle } from "@/src/features/public-facilities";
 import { useDeviceLocation } from "@/src/shared/location";
 import { PloggingMap } from "@/src/shared/map";
 import { colors, shadows } from "@/src/shared/theme";
 import {
   CameraGlyph,
+  CenterToast,
   MapControls,
   PauseGlyph,
   PlayGlyph,
@@ -28,6 +26,8 @@ import { uploadPloggingPhoto } from "../services/upload-plogging-photo";
 
 type LiveStat = { label: string; unit: string; value: string };
 
+const HEATMAP_LEGEND_TOP_OFFSET = 184;
+
 export function ActivePloggingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); // 🌟 Safe Area 훅 추가
@@ -35,34 +35,37 @@ export function ActivePloggingScreen() {
   const timer = usePloggingTimer();
   const { position } = useDeviceLocation();
   const [heatmapVisible, setHeatmapVisible] = useState(false);
-  const [restroomVisible, setRestroomVisible] = useState(false);
-  const toiletsState = useNearbyToilets({ enabled: restroomVisible });
-  const toiletMarkers =
-    restroomVisible && toiletsState.status === "success"
-      ? toiletsState.toilets.map((toilet) => ({
-          id: toilet.id,
-          latitude: toilet.latitude,
-          longitude: toilet.longitude,
-          tintColor: getToiletTintColor(toilet.openTimeType),
-        }))
-      : undefined;
+  const {
+    noNearbyToiletsMessage,
+    noNearbyToiletsNoticeVisible,
+    restroomVisible,
+    toggleRestroom,
+    toiletMarkers,
+  } = useRestroomToggle();
   const {
     addPhoto,
     addPhotoObjectUrl,
     caloriesBurned,
     distanceMeters,
     finishSession,
+    mode,
     photoUris,
+    recommendedRoutePoints,
     resetSession,
+    routePoints,
     startSession,
     stepCount,
   } = usePloggingSession();
+  const visibleRoutePoints =
+    mode === "RECOMMENDED" && recommendedRoutePoints.length >= 2
+      ? recommendedRoutePoints
+      : routePoints;
 
   // 새 세션 시작 시 이전 세션의 누적 데이터(사진/좌표/걸음 등)를 비운다.
   // 사용자가 /report 까지 갔다가 뒤로 와서 새로 시작하는 경우에도 같은 화면이 다시 mount 되므로 안전하다.
   // reset 직후 시작 시각을 즉시 고정한다.
   useEffect(() => {
-    resetSession();
+    resetSession({ preserveRecommendedRoute: true });
     startSession();
   }, [resetSession, startSession]);
 
@@ -120,13 +123,17 @@ export function ActivePloggingScreen() {
     <ScreenRoot>
       <PloggingMap
         dimmed
+        heatmapLegendTop={Math.max(insets.top, 44) + HEATMAP_LEGEND_TOP_OFFSET}
         heatmapVisible={heatmapVisible}
+        routePoints={visibleRoutePoints}
+        routeVisible={visibleRoutePoints.length >= 2}
         toilets={toiletMarkers}
         zoom={17}
       >
         {/* 상단 노치 영역을 고려하여 top 위치 동적 할당 */}
         <PloggingTimerCard
           formattedElapsed={timer.formatted}
+          modeLabel={mode === "RECOMMENDED" ? "AI 추천" : "자유모드"}
           stats={liveStats}
           top={Math.max(insets.top, 44) + 16}
         />
@@ -134,9 +141,13 @@ export function ActivePloggingScreen() {
         <MapControls
           heatmapActive={heatmapVisible}
           onToggleHeatmap={() => setHeatmapVisible((prev) => !prev)}
-          onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
+          onToggleRestroom={toggleRestroom}
           restroomActive={restroomVisible}
           top={Math.max(insets.top, 44) + 184}
+        />
+        <CenterToast
+          message={noNearbyToiletsMessage}
+          visible={noNearbyToiletsNoticeVisible}
         />
         {/* 하단 제스처 바 영역을 고려하여 bottom 위치 동적 할당 */}
         <ActionDock
@@ -185,16 +196,18 @@ function toPhotoUploadContentType(contentType: string) {
 function PloggingTimerCard({
   top,
   formattedElapsed,
+  modeLabel,
   stats,
 }: {
   top: number;
   formattedElapsed: string;
+  modeLabel: string;
   stats: LiveStat[];
 }) {
   return (
     <View style={[styles.timerCard, { top }]}>
       <Text selectable style={styles.modeLabel}>
-        자유모드
+        {modeLabel}
       </Text>
       <Text
         adjustsFontSizeToFit

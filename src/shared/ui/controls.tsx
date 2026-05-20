@@ -1,12 +1,10 @@
-import { Feather } from "@expo/vector-icons";
-import { Image } from "expo-image";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
   View,
-  type ImageStyle,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -16,13 +14,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, shadows } from "../theme";
 
 type FeatherName = ComponentProps<typeof Feather>["name"];
-type MapControlIconSource = ComponentProps<typeof Image>["source"];
+type MapControlIconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 export type PloggingMode = "free" | "ai";
-
-const mapControlWeatherIcon: MapControlIconSource =
-  require("@/assets/icons/map-control-weather.png");
-const mapControlRestroomIcon: MapControlIconSource =
-  require("@/assets/icons/map-control-restroom.png");
 
 export function IconCircleButton({
   name,
@@ -103,38 +96,40 @@ export function MapControls({
   return (
     <View style={[styles.mapControls, { top }]}>
       {onToggleHeatmap ? (
-        <FeatherMapControlButton
+        <MapControlButton
           accessibilityState={{ selected: heatmapActive }}
           active={heatmapActive}
           label={heatmapActive ? "히트맵 숨기기" : "히트맵 표시"}
-          name="activity"
+          name="weather-sunny"
           onPress={onToggleHeatmap}
         />
       ) : (
-        <FigmaMapControlButton label="날씨" source={mapControlWeatherIcon} />
+        <MapControlButton label="날씨" name="weather-sunny" />
       )}
-      <FigmaMapControlButton
+      <MapControlButton
         accessibilityState={{ selected: restroomActive }}
         active={restroomActive}
         label={restroomActive ? "화장실 숨기기" : "화장실 표시"}
+        name="toilet"
         onPress={onToggleRestroom}
-        source={mapControlRestroomIcon}
       />
     </View>
   );
 }
 
-function FeatherMapControlButton({
+function MapControlButton({
   accessibilityState,
   active = false,
+  iconSize = 24,
   label,
   name,
   onPress,
 }: {
   accessibilityState?: ComponentProps<typeof Pressable>["accessibilityState"];
   active?: boolean;
+  iconSize?: number;
   label: string;
-  name: FeatherName;
+  name: MapControlIconName;
   onPress?: () => void;
 }) {
   return (
@@ -150,42 +145,10 @@ function FeatherMapControlButton({
         pressed ? styles.pressed : null,
       ]}
     >
-      <Feather color={active ? colors.surface : colors.icon} name={name} size={23} />
-    </Pressable>
-  );
-}
-
-function FigmaMapControlButton({
-  accessibilityState,
-  active = false,
-  label,
-  onPress,
-  source,
-}: {
-  accessibilityState?: ComponentProps<typeof Pressable>["accessibilityState"];
-  active?: boolean;
-  label: string;
-  onPress?: () => void;
-  source: MapControlIconSource;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      accessibilityState={accessibilityState}
-      hitSlop={8}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.figmaIconCircle,
-        active ? styles.figmaIconCircleActive : null,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      <Image
-        contentFit="contain"
-        source={source}
-        style={styles.figmaMapIcon}
-        tintColor={active ? colors.surface : undefined}
+      <MaterialCommunityIcons
+        color={active ? colors.surface : colors.icon}
+        name={name}
+        size={iconSize}
       />
     </Pressable>
   );
@@ -293,7 +256,6 @@ const styles = StyleSheet.create<{
   backButton: ViewStyle;
   figmaIconCircle: ViewStyle;
   figmaIconCircleActive: ViewStyle;
-  figmaMapIcon: ImageStyle;
   pressed: ViewStyle;
   mapControls: ViewStyle;
   primaryBottomButton: ViewStyle;
@@ -320,11 +282,7 @@ const styles = StyleSheet.create<{
     ...shadows.soft,
   },
   figmaIconCircleActive: {
-    backgroundColor: colors.primary,
-  },
-  figmaMapIcon: {
-    height: 24,
-    width: 24,
+    backgroundColor: "#0A0A0A",
   },
   backButton: {
     alignItems: "center",
