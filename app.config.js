@@ -7,7 +7,7 @@ export default ({ config }) => ({
   slug: "NaverMapPloggingApp",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/images/icon.png",
+  icon: "./assets/icons/appIcon.png",
   scheme: "navermapploggingapp",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -19,6 +19,7 @@ export default ({ config }) => ({
     // iOS 위치 권한 메시지 추가
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
+      ITSAppUsesNonExemptEncryption: false,
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
       NSMotionUsageDescription: "플로깅 중 걸음 수를 측정하기 위해 동작 인식 권한이 필요합니다.",
       NSPhotoLibraryUsageDescription: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
@@ -48,10 +49,8 @@ export default ({ config }) => ({
   
   android: {
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      backgroundColor: "#FFFFFF",
+      foregroundImage: "./assets/icons/appIcon.png",
     },
     edgeToEdgeEnabled: true,
     usesCleartextTraffic: true,
@@ -67,7 +66,7 @@ export default ({ config }) => ({
   
   web: {
     output: "static",
-    favicon: "./assets/images/favicon.png",
+    favicon: "./assets/icons/appIcon.png",
   },
   
   plugins: [
@@ -94,11 +93,11 @@ export default ({ config }) => ({
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
+        imageWidth: 190,
         resizeMode: "contain",
         backgroundColor: "#ffffff",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#ffffff",
         },
       },
     ],
@@ -117,6 +116,12 @@ export default ({ config }) => ({
       },
     ],
   ],
+  extra: {
+    ...config.extra,
+    eas: {
+      projectId: "2f86cd67-1abb-4c64-a62b-5df3a9535df7",
+    },
+  },
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
