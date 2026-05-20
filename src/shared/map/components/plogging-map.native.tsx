@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import { StyleSheet, View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   NaverMapMarkerOverlay,
   NaverMapPolygonOverlay,
   NaverMapPolylineOverlay,
   NaverMapView,
+  type NaverMapViewProps,
   type NaverMapViewRef,
 } from "@mj-studio/react-native-naver-map";
 
@@ -12,7 +21,7 @@ import { useDeviceLocation } from "../../location";
 import { colors } from "../../theme";
 import { CAMPUS_CAMERA, ROUTE_COORDS } from "../data/map-data";
 import { useHotspotPolygons } from "../hooks/use-hotspot-polygons";
-import { getHotspotColor } from "../services/hotspot-tiles";
+import { getHotspotBlobColor } from "../services/hotspot-tiles";
 import {
   buildRouteGuideMarkers,
   type RouteGuideMarkers,
@@ -23,6 +32,17 @@ import type { PloggingMapProps } from "./types";
 // 이 이상 좌표가 변할 때만 카메라를 다시 애니메이션한다(약 22m).
 // GPS 지터로 카메라가 계속 흔들리지 않게 막는 임계값.
 const CAMERA_ANIMATE_THRESHOLD = 0.0002;
+const FACILITY_MARKER_SIZE = 36;
+const FACILITY_MARKER_HEIGHT = 44;
+const FACILITY_MARKER_ICON_SIZE = 20;
+const FACILITY_MARKER_HIDE_ZOOM = 13.8;
+const FACILITY_MARKER_FULL_ZOOM = 15;
+const FACILITY_MARKER_ZOOM_UPDATE_THRESHOLD = 0.04;
+
+type FacilityIconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+type CameraChangedParams = Parameters<
+  NonNullable<NaverMapViewProps["onCameraChanged"]>
+>[0];
 
 export function PloggingMap({
   children,
@@ -42,6 +62,8 @@ export function PloggingMap({
   const { position } = useDeviceLocation();
   const positionLatitude = position?.latitude;
   const positionLongitude = position?.longitude;
+  const initialZoom = zoom ?? CAMPUS_CAMERA.zoom;
+  const [cameraZoom, setCameraZoom] = useState(initialZoom);
   const hotspots = useHotspotPolygons(heatmapVisible);
   const visibleRoutePoints =
     routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
@@ -49,6 +71,7 @@ export function PloggingMap({
     () => buildRouteGuideMarkers(visibleRoutePoints),
     [visibleRoutePoints]
   );
+  const facilityMarkerAlpha = getFacilityMarkerAlpha(cameraZoom);
 
   // 최초 카메라는 mount 시점 공유 위치(없으면 CAMPUS_CAMERA fallback).
   // 이후 위치 변경은 animateCameraTo로 부드럽게 이동시킨다.
@@ -68,7 +91,7 @@ export function PloggingMap({
       initialPositionRef.current?.latitude ?? CAMPUS_CAMERA.latitude,
     longitude:
       initialPositionRef.current?.longitude ?? CAMPUS_CAMERA.longitude,
-    zoom: zoom ?? CAMPUS_CAMERA.zoom,
+    zoom: initialZoom,
   };
 
   useEffect(() => {
@@ -107,6 +130,34 @@ export function PloggingMap({
     mapRef.current?.setLocationTrackingMode("NoFollow");
   };
 
+  const handleCameraChanged = useCallback((params: CameraChangedParams) => {
+    const nextZoom = params.zoom;
+    if (typeof nextZoom === "number") {
+      setCameraZoom((prevZoom) =>
+        Math.abs(prevZoom - nextZoom) < FACILITY_MARKER_ZOOM_UPDATE_THRESHOLD
+          ? prevZoom
+          : nextZoom
+      );
+    }
+
+    if (__DEV__) {
+      const prev = lastCameraLogRef.current;
+      const dLat = prev ? Math.abs(params.latitude - prev.latitude) : Infinity;
+      const dLng = prev ? Math.abs(params.longitude - prev.longitude) : Infinity;
+      if (dLat > 0.001 || dLng > 0.001) {
+        console.log("[map-gps] camera moved", {
+          latitude: params.latitude,
+          longitude: params.longitude,
+          reason: params.reason,
+        });
+        lastCameraLogRef.current = {
+          latitude: params.latitude,
+          longitude: params.longitude,
+        };
+      }
+    }
+  }, []);
+
   return (
     <View style={[styles.container, style]}>
       <NaverMapView
@@ -133,40 +184,17 @@ export function PloggingMap({
               }
             : undefined
         }
-        onCameraChanged={
-          __DEV__
-            ? (params) => {
-                const prev = lastCameraLogRef.current;
-                const dLat = prev
-                  ? Math.abs(params.latitude - prev.latitude)
-                  : Infinity;
-                const dLng = prev
-                  ? Math.abs(params.longitude - prev.longitude)
-                  : Infinity;
-                if (dLat > 0.001 || dLng > 0.001) {
-                  console.log("[map-gps] camera moved", {
-                    latitude: params.latitude,
-                    longitude: params.longitude,
-                    reason: params.reason,
-                  });
-                  lastCameraLogRef.current = {
-                    latitude: params.latitude,
-                    longitude: params.longitude,
-                  };
-                }
-              }
-            : undefined
-        }
+        onCameraChanged={handleCameraChanged}
         onInitialized={handleInitialized}
         style={StyleSheet.absoluteFill}
       >
         {heatmapVisible
-          ? hotspots.polygons.map((polygon) => (
+          ? hotspots.polygons.map((hotspot) => (
               <NaverMapPolygonOverlay
-                key={polygon.id}
-                color={getHotspotColor(polygon.trashScore)}
-                coords={polygon.coords}
-                outlineColor="rgba(185, 28, 28, 0.12)"
+                key={hotspot.id}
+                color={getHotspotBlobColor(hotspot.trashScore)}
+                coords={hotspot.blobCoords}
+                outlineColor="rgba(255, 255, 255, 0)"
                 outlineWidth={0}
                 zIndex={1}
               />
@@ -185,26 +213,79 @@ export function PloggingMap({
         ) : null}
         {trashBins?.map((bin) => (
           <NaverMapMarkerOverlay
+            alpha={facilityMarkerAlpha}
+            anchor={{ x: 0.5, y: 1 }}
+            height={FACILITY_MARKER_HEIGHT}
+            isHidden={facilityMarkerAlpha <= 0}
+            isHideCollidedMarkers
             key={`trash-${bin.id}`}
             latitude={bin.latitude}
             longitude={bin.longitude}
-            tintColor={bin.tintColor}
+            minZoom={FACILITY_MARKER_HIDE_ZOOM}
+            width={FACILITY_MARKER_SIZE}
             zIndex={6}
-          />
+          >
+            <FacilityMarker
+              color={bin.tintColor ?? "#6B7280"}
+              iconName="trash-can"
+              markerKey={`trash-${bin.id}-${bin.tintColor ?? "fallback"}`}
+            />
+          </NaverMapMarkerOverlay>
         ))}
         {toilets?.map((toilet) => (
           <NaverMapMarkerOverlay
+            alpha={facilityMarkerAlpha}
+            anchor={{ x: 0.5, y: 1 }}
+            height={FACILITY_MARKER_HEIGHT}
+            isHidden={facilityMarkerAlpha <= 0}
+            isHideCollidedMarkers
             key={`toilet-${toilet.id}`}
             latitude={toilet.latitude}
             longitude={toilet.longitude}
-            tintColor={toilet.tintColor}
+            minZoom={FACILITY_MARKER_HIDE_ZOOM}
+            width={FACILITY_MARKER_SIZE}
             zIndex={6}
-          />
+          >
+            <FacilityMarker
+              color={toilet.tintColor ?? "#8B5CF6"}
+              iconName="toilet"
+              markerKey={`toilet-${toilet.id}-${toilet.tintColor ?? "fallback"}`}
+            />
+          </NaverMapMarkerOverlay>
         ))}
       </NaverMapView>
-      {dimmed ? <View style={styles.dimmed} /> : null}
+      {dimmed ? (
+        <View style={[styles.dimmed, heatmapVisible ? styles.dimmedHeatmap : null]} />
+      ) : null}
       {heatmapLegendVisible ? <HeatmapLegend top={heatmapLegendTop} /> : null}
       {children}
+    </View>
+  );
+}
+
+function FacilityMarker({
+  color,
+  iconName,
+  markerKey,
+}: {
+  color: string;
+  iconName: FacilityIconName;
+  markerKey: string;
+}) {
+  return (
+    <View
+      key={markerKey}
+      collapsable={false}
+      style={styles.facilityMarker}
+    >
+      <View style={[styles.facilityMarkerBubble, { backgroundColor: color }]}>
+        <MaterialCommunityIcons
+          color={colors.surface}
+          name={iconName}
+          size={FACILITY_MARKER_ICON_SIZE}
+        />
+      </View>
+      <View style={[styles.facilityMarkerTail, { borderTopColor: color }]} />
     </View>
   );
 }
@@ -238,6 +319,16 @@ function RouteGuideOverlays({ guides }: { guides: RouteGuideMarkers }) {
   );
 }
 
+function getFacilityMarkerAlpha(zoomLevel: number): number {
+  if (zoomLevel <= FACILITY_MARKER_HIDE_ZOOM) return 0;
+  if (zoomLevel >= FACILITY_MARKER_FULL_ZOOM) return 1;
+
+  const progress =
+    (zoomLevel - FACILITY_MARKER_HIDE_ZOOM) /
+    (FACILITY_MARKER_FULL_ZOOM - FACILITY_MARKER_HIDE_ZOOM);
+  return progress * progress * (3 - 2 * progress);
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -247,6 +338,34 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255, 255, 255, 0.50)",
     pointerEvents: "none",
+  },
+  dimmedHeatmap: {
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+  },
+  facilityMarker: {
+    alignItems: "center",
+    height: FACILITY_MARKER_HEIGHT,
+    justifyContent: "flex-start",
+    width: FACILITY_MARKER_SIZE,
+  },
+  facilityMarkerBubble: {
+    alignItems: "center",
+    borderColor: colors.surface,
+    borderRadius: FACILITY_MARKER_SIZE / 2,
+    borderWidth: 2,
+    height: FACILITY_MARKER_SIZE,
+    justifyContent: "center",
+    width: FACILITY_MARKER_SIZE,
+  },
+  facilityMarkerTail: {
+    borderLeftColor: "transparent",
+    borderLeftWidth: 5,
+    borderRightColor: "transparent",
+    borderRightWidth: 5,
+    borderTopWidth: 7,
+    height: 0,
+    marginTop: -2,
+    width: 0,
   },
   routeArrowHead: {
     borderBottomColor: colors.surface,

@@ -32,6 +32,7 @@ export function usePloggingTracker({
   const [pedometerAvailable, setPedometerAvailable] = useState(false);
 
   const isPausedRef = useRef(isPaused);
+  const lastPedometerStepsRef = useRef<number | null>(null);
   const placeNameSetRef = useRef(false);
 
   useEffect(() => {
@@ -163,9 +164,31 @@ export function usePloggingTracker({
           console.log("[plogging-pedometer] starting watch");
         }
 
+        lastPedometerStepsRef.current = null;
         subscription = Pedometer.watchStepCount((event) => {
-          if (isPausedRef.current) return;
-          addSteps(event.steps);
+          const observedSteps = toWholeStepCount(event.steps);
+          if (observedSteps === null) return;
+
+          const previousSteps = lastPedometerStepsRef.current;
+          lastPedometerStepsRef.current = observedSteps;
+
+          if (previousSteps === null) {
+            if (!isPausedRef.current && observedSteps > 0) {
+              addSteps(observedSteps);
+            }
+            return;
+          }
+
+          // Native pedometer updates are cumulative since the native watch started.
+          // If the native watch restarts and the value drops, use the new value as
+          // the baseline rather than subtracting across two different counters.
+          if (observedSteps < previousSteps) {
+            return;
+          }
+
+          const delta = observedSteps - previousSteps;
+          if (isPausedRef.current || delta <= 0) return;
+          addSteps(delta);
         });
       } catch (error) {
         if (__DEV__) {
@@ -219,6 +242,11 @@ async function resolvePlaceName(point: {
     }
     return null;
   }
+}
+
+function toWholeStepCount(value: number): number | null {
+  if (!Number.isFinite(value)) return null;
+  return Math.max(0, Math.floor(value));
 }
 
 function showSettingsAlert(title: string, message: string) {

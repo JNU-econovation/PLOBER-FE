@@ -10,7 +10,7 @@
 - 프론트 환경변수 예시: `EXPO_PUBLIC_API_BASE_URL=http://13.125.28.197:8080`
 - Swagger UI: `http://13.125.28.197:8080/swagger-ui/index.html`
 
-Swagger 기준 총 18개 엔드포인트가 있습니다. Swagger에는 별도 `securitySchemes`가 정의되어 있지 않으므로, 이 문서는 스펙에 노출된 요청/응답 구조만 정리합니다.
+Swagger 기준 총 20개 API operation이 있습니다. Swagger에는 별도 `securitySchemes`가 정의되어 있지 않으므로, 이 문서는 스펙에 노출된 요청/응답 구조만 정리합니다.
 
 ## 공통 연동 메모
 
@@ -73,6 +73,20 @@ type LoginRequest = {
 - Response body: `LoginResponse`
 - 프론트 연동 메모: Apple 로그인 성공 후 받은 `identityToken`을 전달하고, 응답 토큰을 세션 저장소에 저장합니다.
 
+### POST `/api/auth/logout`
+
+로그아웃을 처리합니다.
+
+- Query parameters
+
+| 이름     | 타입     | 필수 | 설명      |
+| -------- | -------- | ---- | --------- |
+| `userId` | `number` | Yes  | 사용자 ID |
+
+- Request body: 없음
+- Response body: 없음. Swagger responses에는 `200 OK`로 정의되어 있습니다.
+- 프론트 연동 메모: Swagger 설명상 서버 처리는 없고 클라이언트가 토큰을 삭제해야 합니다.
+
 ## User
 
 ### GET `/api/users/me`
@@ -88,6 +102,20 @@ type LoginRequest = {
 - Request body: 없음
 - Response body: `UserInfoResponse`
 - 프론트 연동 메모: 프로필 화면의 기본 사용자 정보로 사용할 수 있습니다.
+
+### DELETE `/api/users/me`
+
+회원 탈퇴를 처리합니다.
+
+- Query parameters
+
+| 이름     | 타입     | 필수 | 설명      |
+| -------- | -------- | ---- | --------- |
+| `userId` | `number` | Yes  | 사용자 ID |
+
+- Request body: 없음
+- Response body: 없음. `200 OK`면 요청 성공입니다.
+- 프론트 연동 메모: 계정 및 연관 데이터 삭제 API입니다. 성공 후 로컬 세션/캐시를 정리하고 로그인 화면으로 이동합니다.
 
 ### GET `/api/users/me/plogging-stats`
 

@@ -39,7 +39,7 @@ const DEFAULT_TIME_MINUTES = 30;
 const MIN_TIME_MINUTES = 10;
 const MAX_TIME_MINUTES = 120;
 const TIME_STEP_MINUTES = 5;
-const HEATMAP_LEGEND_TOP_OFFSET = 132;
+const HEATMAP_LEGEND_TOP_OFFSET = 112;
 
 export function HomeScreen() {
   const router = useRouter();

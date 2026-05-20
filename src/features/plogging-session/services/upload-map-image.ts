@@ -1,3 +1,5 @@
+import * as FileSystem from "expo-file-system/legacy";
+
 import { getMapImageUploadUrl } from "../api/get-map-image-upload-url";
 import type { MapImageUploadContentType } from "../api/types";
 
@@ -25,42 +27,17 @@ export async function uploadMapImage(
       userId,
     });
 
-    const fileResponse = await fetchWithTimeout(
+    const uploadResponse = await uploadLocalImageFile({
+      contentType,
       localUri,
-      undefined,
-      "지도 이미지 파일을 읽는 시간이 초과되었습니다."
-    );
-    if (!fileResponse.ok) {
-      throw new Error(`로컬 파일 읽기 실패 (${fileResponse.status})`);
-    }
-    const blob = await fileResponse.blob();
-    if (blob.size === 0) {
-      throw new Error("지도 이미지 파일이 비어 있습니다.");
-    }
-
-    const putResponse = await fetchWithTimeout(
       uploadUrl,
-      {
-        method: "PUT",
-        body: blob,
-        headers: { "Content-Type": contentType },
-      },
-      "지도 이미지 업로드 시간이 초과되었습니다. 다시 시도해주세요."
-    );
-
-    if (!putResponse.ok) {
-      const errorBody = await putResponse.text().catch(() => "");
-      if (__DEV__) {
-        console.log("[plogging-map-upload] upload failed", {
-          body: errorBody,
-          status: putResponse.status,
-        });
-      }
-      throw new Error(`S3 업로드 실패 (${putResponse.status})`);
-    }
+    });
 
     if (__DEV__) {
-      console.log("[plogging-map-upload] uploaded", { objectUrl });
+      console.log("[plogging-map-upload] uploaded", {
+        objectUrl,
+        status: uploadResponse.status,
+      });
     }
 
     return { status: "uploaded", objectUrl };
@@ -80,28 +57,82 @@ export async function uploadMapImage(
   }
 }
 
-async function fetchWithTimeout(
-  input: Parameters<typeof fetch>[0],
-  init: Parameters<typeof fetch>[1],
-  timeoutMessage: string
-): Promise<Response> {
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => {
-    abortController.abort();
-  }, MAP_IMAGE_UPLOAD_TIMEOUT_MS);
+async function uploadLocalImageFile({
+  contentType,
+  localUri,
+  uploadUrl,
+}: {
+  contentType: MapImageUploadContentType;
+  localUri: string;
+  uploadUrl: string;
+}): Promise<FileSystem.FileSystemUploadResult> {
+  const fileUri = normalizeLocalFileUri(localUri);
+  const fileInfo = await FileSystem.getInfoAsync(fileUri);
+
+  if (!fileInfo.exists) {
+    throw new Error("지도 이미지 파일을 찾을 수 없습니다.");
+  }
+  if (fileInfo.isDirectory) {
+    throw new Error("지도 이미지 경로가 파일이 아닙니다.");
+  }
+  if (fileInfo.size === 0) {
+    throw new Error("지도 이미지 파일이 비어 있습니다.");
+  }
+
+  if (__DEV__) {
+    console.log("[plogging-map-upload] local file ready", {
+      fileSize: fileInfo.size,
+      fileUri,
+    });
+  }
+
+  const uploadResponse = await withTimeout(
+    FileSystem.uploadAsync(uploadUrl, fileUri, {
+      headers: { "Content-Type": contentType },
+      httpMethod: "PUT",
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    }),
+    MAP_IMAGE_UPLOAD_TIMEOUT_MS,
+    "지도 이미지 업로드 시간이 초과되었습니다. 다시 시도해주세요."
+  );
+
+  if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
+    if (__DEV__) {
+      console.log("[plogging-map-upload] upload failed", {
+        body: uploadResponse.body,
+        status: uploadResponse.status,
+      });
+    }
+    throw new Error(`S3 업로드 실패 (${uploadResponse.status})`);
+  }
+
+  return uploadResponse;
+}
+
+function normalizeLocalFileUri(uri: string): string {
+  if (hasUriScheme(uri)) return uri;
+  return `file://${uri}`;
+}
+
+function hasUriScheme(uri: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(uri);
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   try {
-    return await fetch(input, {
-      ...init,
-      signal: abortController.signal,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(timeoutMessage);
-    }
-
-    throw error;
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }

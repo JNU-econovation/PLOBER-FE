@@ -31,7 +31,7 @@ type RouteCardState =
   | { status: "error"; message: string; onRetry: () => void };
 
 const MAP_CONTROL_TOP_OFFSET = 131;
-const HEATMAP_LEGEND_TOP_OFFSET = 132;
+const HEATMAP_LEGEND_TOP_OFFSET = 112;
 const ROUTE_CARD_GAP = 28;
 const ROUTE_CARD_HEIGHT = 86;
 const START_BUTTON_HEIGHT = 98;

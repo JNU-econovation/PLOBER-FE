@@ -19,9 +19,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { captureRef } from "react-native-view-shot";
 
 import { useAuthSession } from "@/src/features/auth";
 import { completePloggingSession } from "@/src/features/plogging-session/api/complete-plogging-session";
+import type { CompletePloggingSessionRequest } from "@/src/features/plogging-session/api/types";
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
 
@@ -32,6 +34,7 @@ const PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT = 70;
 const FLOATING_SHARE_BUTTON_GAP = 18;
 const FLOATING_SHARE_BUTTON_HEIGHT = 43;
 const FLOATING_SHARE_BUTTON_SCROLL_GAP = 24;
+const SHARE_PREVIEW_WIDTH = 390;
 
 type MapImageUploadState = "idle" | "uploading" | "uploaded" | "error";
 
@@ -55,6 +58,10 @@ function formatKilometers(meters: number): string {
   return (meters / 1000).toFixed(1);
 }
 
+function formatKilometersForRecord(meters: number): string {
+  return (meters / 1000).toFixed(2);
+}
+
 function formatInteger(value: number): string {
   return Math.round(value).toLocaleString("ko-KR");
 }
@@ -64,6 +71,52 @@ function formatHmDuration(totalSeconds: number): string {
   const hours = Math.floor(safe / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
   return `${hours}:${pad2(minutes)}`;
+}
+
+function waitForNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
+async function sharePloggingImage({
+  message,
+  shareImageUri,
+}: {
+  message: string;
+  shareImageUri: string;
+}) {
+  try {
+    const Sharing = await import("expo-sharing");
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(shareImageUri, {
+        UTI: "public.png",
+        dialogTitle: "플로깅 기록 공유하기",
+        mimeType: "image/png",
+      });
+      return;
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.log("[plogging-share] expo-sharing unavailable", {
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+
+  await Share.share(
+    {
+      message,
+      title: "플로깅 완료",
+      url: shareImageUri,
+    },
+    {
+      dialogTitle: "플로깅 기록 공유하기",
+      subject: "플로깅 완료",
+    }
+  );
 }
 
 function buildShareMessage({
@@ -133,6 +186,7 @@ export function ReportScreen() {
   const [mapImageUploadState, setMapImageUploadState] =
     useState<MapImageUploadState>("idle");
   const submittedRef = useRef(false);
+  const sharePreviewRef = useRef<View>(null);
   const shareButtonBottom =
     insets.bottom + PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT + FLOATING_SHARE_BUTTON_GAP;
 
@@ -162,6 +216,8 @@ export function ReportScreen() {
   const stepCountLabel = formatInteger(stepCount);
   const ploggingTimeLabel = formatHmDuration(ploggingSecondsForView);
   const caloriesLabel = formatInteger(caloriesBurned);
+  const shareDistanceKm = formatKilometersForRecord(distanceMeters);
+  const shareMapImageUri = mapImageUri ?? mapImageObjectUrl;
   const metrics: ReportMetric[] = [
     { label: "걸음 수", unit: "steps", value: stepCountLabel },
     { label: "플로깅 시간", unit: "H:M", value: ploggingTimeLabel },
@@ -171,6 +227,19 @@ export function ReportScreen() {
 
   const handleShare = useCallback(async () => {
     if (sharing) return;
+
+    if (hasRouteForMap && !shareMapImageUri) {
+      Alert.alert(
+        "공유 준비 중",
+        "경로가 그려진 공유 이미지를 만들고 있어요. 잠시 후 다시 시도해주세요."
+      );
+      return;
+    }
+
+    if (!sharePreviewRef.current) {
+      Alert.alert("공유 실패", "공유 이미지를 만들 수 없습니다.");
+      return;
+    }
 
     const message = buildShareMessage({
       caloriesLabel,
@@ -184,19 +253,18 @@ export function ReportScreen() {
 
     setSharing(true);
     try {
-      await Share.share(
-        {
-          message,
-          title: "플로깅 완료",
-        },
-        {
-          dialogTitle: "플로깅 기록 공유하기",
-          subject: "플로깅 완료",
-        }
-      );
+      await waitForNextPaint();
+
+      const shareImageUri = await captureRef(sharePreviewRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+      });
+
+      await sharePloggingImage({ message, shareImageUri });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "공유 화면을 열 수 없습니다.";
+        error instanceof Error ? error.message : "공유 이미지를 만들 수 없습니다.";
       Alert.alert("공유 실패", message);
     } finally {
       setSharing(false);
@@ -205,9 +273,11 @@ export function ReportScreen() {
     caloriesLabel,
     dateLabel,
     distanceKm,
+    hasRouteForMap,
     mapImageObjectUrl,
     placeName,
     ploggingTimeLabel,
+    shareMapImageUri,
     sharing,
     stepCountLabel,
   ]);
@@ -272,12 +342,12 @@ export function ReportScreen() {
         setMapImageObjectUrl(uploadResult.objectUrl);
       }
 
-      const payload = {
+      const payload: CompletePloggingSessionRequest = {
         mode,
         startedAt: new Date(startedAtMs).toISOString(),
         finishedAt: new Date(finishedAt).toISOString(),
         distanceMeters: Math.round(distanceMeters),
-        stepCount,
+        stepCount: Math.round(stepCount),
         caloriesBurned: Math.round(caloriesBurned),
         ploggingSeconds,
         restSeconds,
@@ -370,6 +440,23 @@ export function ReportScreen() {
         onPress={handleComplete}
         title={completeButtonTitle}
       />
+      <View
+        ref={sharePreviewRef}
+        collapsable={false}
+        pointerEvents="none"
+        style={styles.sharePreviewHost}
+      >
+        <SharePreviewCard
+          dateLabel={dateLabel}
+          distanceKm={shareDistanceKm}
+          mapImageUri={shareMapImageUri}
+          metrics={metrics}
+          modeLabel={modeLabel}
+          photoUris={photoUris}
+          placeName={placeName}
+          timeRangeLabel={timeRangeLabel}
+        />
+      </View>
     </ScreenRoot>
   );
 }
@@ -551,6 +638,106 @@ function MetricCell({ metric }: { metric: ReportMetric }) {
         {metric.label}
       </Text>
       <StatNumber size={24} unit={metric.unit} value={metric.value} />
+    </View>
+  );
+}
+
+function SharePreviewCard({
+  dateLabel,
+  distanceKm,
+  mapImageUri,
+  metrics,
+  modeLabel,
+  photoUris,
+  placeName,
+  timeRangeLabel,
+}: {
+  dateLabel: string;
+  distanceKm: string;
+  mapImageUri: string | null;
+  metrics: ReportMetric[];
+  modeLabel: string;
+  photoUris: string[];
+  placeName: string;
+  timeRangeLabel: string;
+}) {
+  return (
+    <View style={styles.sharePreviewCanvas}>
+      <View style={styles.statusPill}>
+        <Text selectable style={styles.statusText}>
+          {modeLabel}
+        </Text>
+      </View>
+
+      {dateLabel ? (
+        <Text selectable style={styles.reportTitle}>
+          <Text style={styles.reportTitleBold}>{dateLabel}</Text> 플로깅
+        </Text>
+      ) : null}
+      {timeRangeLabel ? (
+        <Text selectable style={styles.reportSubTitle}>
+          {timeRangeLabel}
+          {placeName ? (
+            <>
+              {" · "}
+              <Text style={styles.reportSubTitleBold}>{placeName}</Text>
+            </>
+          ) : null}
+        </Text>
+      ) : null}
+
+      <View style={styles.distanceCard}>
+        <Text selectable style={styles.cardCaption}>
+          DISTANCE
+        </Text>
+        <View style={styles.distanceHeader}>
+          <StatNumber size={36} unit="km" value={distanceKm} />
+        </View>
+        <View style={styles.miniMap}>
+          {mapImageUri ? (
+            <Image
+              accessibilityLabel="플로깅 경로 이미지"
+              source={{ uri: mapImageUri }}
+              style={styles.miniMapImage}
+            />
+          ) : (
+            <View style={styles.miniMapEmpty}>
+              <Text selectable style={styles.miniMapEmptyText}>
+                지도 이미지가 없습니다.
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <ReportMetricsCard metrics={metrics} />
+      <SharePreviewPhotoSection photoUris={photoUris} />
+    </View>
+  );
+}
+
+function SharePreviewPhotoSection({ photoUris }: { photoUris: string[] }) {
+  if (photoUris.length === 0) return null;
+
+  return (
+    <View style={styles.sharePhotoSection}>
+      <Text selectable style={styles.sharePhotoSectionTitle}>
+        인증샷
+      </Text>
+      <ScrollView
+        contentContainerStyle={styles.sharePhotoStripContent}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {photoUris.map((uri) => (
+          <Image
+            key={uri}
+            accessibilityLabel="플로깅 인증샷"
+            source={{ uri }}
+            style={styles.sharePhotoThumb}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -773,6 +960,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "500",
     letterSpacing: 0,
+  },
+  sharePhotoSection: {
+    gap: 10,
+    marginTop: 4,
+  },
+  sharePhotoSectionTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0,
+  },
+  sharePhotoStripContent: {
+    gap: 10,
+    paddingVertical: 2,
+  },
+  sharePhotoThumb: {
+    backgroundColor: colors.line,
+    borderRadius: 16,
+    height: 110,
+    width: 110,
+  },
+  sharePreviewCanvas: {
+    backgroundColor: colors.background,
+    gap: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    width: SHARE_PREVIEW_WIDTH,
+  },
+  sharePreviewHost: {
+    left: -10000,
+    position: "absolute",
+    top: 0,
+    width: SHARE_PREVIEW_WIDTH,
   },
   statusPill: {
     alignItems: "center",

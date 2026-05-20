@@ -1,4 +1,8 @@
-import { saveSession, useAuthSession } from "@/src/features/auth";
+import {
+  logout as logoutFromServer,
+  saveSession,
+  useAuthSession,
+} from "@/src/features/auth";
 import { colors, shadows, typography } from "@/src/shared/theme";
 import { ScreenRoot } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
@@ -7,6 +11,7 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   Platform,
@@ -20,6 +25,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  deleteMyAccount,
   getMyPloggingStats,
   getProfileImageUploadUrl,
   getUserProfile,
@@ -35,6 +41,8 @@ import {
 } from "../services";
 
 const MAX_EXPERIENCE_PROGRESS = 100;
+
+type AccountAction = "logout" | "delete" | null;
 
 declare const require: <T = unknown>(moduleName: string) => T;
 
@@ -66,7 +74,7 @@ export function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const contentTopPadding =
     Platform.OS === "ios" ? Math.max(insets.top, 12) + 8 : 8;
-  const { session, status } = useAuthSession();
+  const { clearAuthSession, session, status } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [ploggingStats, setPloggingStats] =
     useState<MyPloggingStats | null>(null);
@@ -83,6 +91,10 @@ export function ProfileScreen() {
     null
   );
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [accountAction, setAccountAction] = useState<AccountAction>(null);
+  const [accountActionError, setAccountActionError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (status === "loading") return;
@@ -301,6 +313,85 @@ export function ProfileScreen() {
     }
   };
 
+  const handleLogout = async () => {
+    if (accountAction) return;
+
+    setAccountAction("logout");
+    setAccountActionError(null);
+
+    try {
+      if (session?.userId) {
+        try {
+          await logoutFromServer({ userId: session.userId });
+        } catch (error) {
+          if (__DEV__) {
+            console.log("[auth] logout api failed; clearing local session", {
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "unknown logout error",
+            });
+          }
+        }
+      }
+
+      await clearAuthSession();
+    } catch (error) {
+      setAccountActionError(
+        error instanceof Error
+          ? error.message
+          : "로그아웃하지 못했습니다."
+      );
+    } finally {
+      setAccountAction(null);
+    }
+  };
+
+  const performDeleteAccount = async () => {
+    if (accountAction) return;
+    if (!session?.userId) {
+      setAccountActionError("로그인 정보가 없습니다. 다시 로그인해주세요.");
+      return;
+    }
+
+    setAccountAction("delete");
+    setAccountActionError(null);
+
+    try {
+      await deleteMyAccount({ userId: session.userId });
+      await clearAuthSession();
+    } catch (error) {
+      setAccountActionError(
+        error instanceof Error
+          ? error.message
+          : "회원 탈퇴를 처리하지 못했습니다."
+      );
+    } finally {
+      setAccountAction(null);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (accountAction) return;
+
+    Alert.alert(
+      "회원 탈퇴",
+      "계정과 모든 플로깅 기록이 삭제됩니다. 계속할까요?",
+      [
+        {
+          text: "취소",
+          style: "cancel",
+        },
+        {
+          onPress: performDeleteAccount,
+          style: "destructive",
+          text: "탈퇴",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   return (
     <ScreenRoot>
       <ScrollView
@@ -329,6 +420,11 @@ export function ProfileScreen() {
             {ploggingStatsError}
           </Text>
         ) : null}
+        {accountActionError ? (
+          <Text selectable style={styles.errorText}>
+            {accountActionError}
+          </Text>
+        ) : null}
         <ProfileOverview
           loading={loadingProfile}
           onChangeProfileImage={handleChangeProfileImage}
@@ -336,6 +432,12 @@ export function ProfileScreen() {
           uploadingProfileImage={uploadingProfileImage}
         />
         <SummaryStatsCard stats={ploggingStats} />
+        <AccountActions
+          busyAction={accountAction}
+          disabled={status !== "authenticated"}
+          onDeleteAccount={handleDeleteAccount}
+          onLogout={handleLogout}
+        />
       </ScrollView>
       <NicknameEditModal
         errorMessage={nicknameError}
@@ -616,7 +718,93 @@ function SummaryStatsCard({ stats }: { stats: MyPloggingStats | null }) {
   );
 }
 
+function AccountActions({
+  busyAction,
+  disabled,
+  onDeleteAccount,
+  onLogout,
+}: {
+  busyAction: AccountAction;
+  disabled: boolean;
+  onDeleteAccount: () => void;
+  onLogout: () => void;
+}) {
+  const actionDisabled = disabled || busyAction !== null;
+
+  return (
+    <View style={styles.accountActions}>
+      <Pressable
+        accessibilityLabel="로그아웃"
+        accessibilityRole="button"
+        disabled={actionDisabled}
+        onPress={onLogout}
+        style={({ pressed }) => [
+          styles.accountButton,
+          styles.logoutButton,
+          pressed && !actionDisabled ? styles.pressed : null,
+          actionDisabled ? styles.disabled : null,
+        ]}
+      >
+        {busyAction === "logout" ? (
+          <ActivityIndicator color={colors.icon} size="small" />
+        ) : (
+          <>
+            <Feather color={colors.icon} name="log-out" size={18} />
+            <Text selectable style={styles.accountButtonText}>
+              로그아웃
+            </Text>
+          </>
+        )}
+      </Pressable>
+      <Pressable
+        accessibilityLabel="회원 탈퇴"
+        accessibilityRole="button"
+        disabled={actionDisabled}
+        onPress={onDeleteAccount}
+        style={({ pressed }) => [
+          styles.accountButton,
+          styles.deleteAccountButton,
+          pressed && !actionDisabled ? styles.pressed : null,
+          actionDisabled ? styles.disabled : null,
+        ]}
+      >
+        {busyAction === "delete" ? (
+          <ActivityIndicator color={colors.danger} size="small" />
+        ) : (
+          <>
+            <Feather color={colors.danger} name="user-x" size={18} />
+            <Text selectable style={styles.deleteAccountButtonText}>
+              회원 탈퇴
+            </Text>
+          </>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  accountActions: {
+    gap: 10,
+    marginTop: 2,
+    width: "100%",
+  },
+  accountButton: {
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    height: 48,
+    justifyContent: "center",
+    width: "100%",
+  },
+  accountButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0,
+  },
   avatar: {
     alignItems: "center",
     backgroundColor: "#E9FFBE",
@@ -682,6 +870,16 @@ const styles = StyleSheet.create({
     gap: 23,
     paddingHorizontal: 24,
   },
+  deleteAccountButton: {
+    backgroundColor: "#FFF7F8",
+    borderColor: "#FFD5DA",
+  },
+  deleteAccountButtonText: {
+    color: colors.danger,
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0,
+  },
   errorText: {
     color: colors.danger,
     fontSize: 13,
@@ -714,6 +912,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     letterSpacing: 0,
+  },
+  logoutButton: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
   },
   disabled: {
     opacity: 0.64,

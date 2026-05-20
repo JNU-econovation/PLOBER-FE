@@ -26,7 +26,7 @@ import { uploadPloggingPhoto } from "../services/upload-plogging-photo";
 
 type LiveStat = { label: string; unit: string; value: string };
 
-const HEATMAP_LEGEND_TOP_OFFSET = 184;
+const HEATMAP_LEGEND_TOP_OFFSET = 168;
 
 export function ActivePloggingScreen() {
   const router = useRouter();

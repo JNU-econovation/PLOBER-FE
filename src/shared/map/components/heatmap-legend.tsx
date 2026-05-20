@@ -5,12 +5,12 @@ import { colors, shadows } from "../../theme";
 
 export function HeatmapLegend({ top }: { top?: number }) {
   return (
-    <View pointerEvents="none" style={[styles.legend, { top: top ?? 176 }]}>
+    <View pointerEvents="none" style={[styles.legend, { top: top ?? 156 }]}>
       <Text selectable style={styles.title}>
         쓰레기 발생률
       </Text>
       <LinearGradient
-        colors={["#F6E284", "#F59E0B", "#C75A3D"]}
+        colors={["#22C55E", "#FACC15", "#F97316", "#EF4444", "#B91C1C"]}
         end={{ x: 1, y: 0 }}
         start={{ x: 0, y: 0 }}
         style={styles.gradient}
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     left: 24,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     position: "absolute",
     width: 120,
     ...shadows.soft,
@@ -43,12 +43,12 @@ const styles = StyleSheet.create({
   gradient: {
     borderRadius: 22,
     height: 8,
-    marginTop: 12,
+    marginTop: 9,
     width: 96,
   },
   label: {
     color: colors.muted,
-    fontSize: 14,
+    fontSize: 12,
     letterSpacing: 0,
   },
   labelRow: {
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#404040",
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "500",
     letterSpacing: 0,
   },
