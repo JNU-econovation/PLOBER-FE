@@ -14,10 +14,12 @@ import {
   subscribeAuthSession,
   type AuthSession,
 } from "../services/session";
+import { completeAppleLogin } from "../services/apple-auth";
 import { completeKakaoLogin } from "../services/kakao-auth";
 
 type AuthSessionContextValue = {
   clearAuthSession: () => Promise<void>;
+  completeAppleLoginWithCredential: () => Promise<AuthSession>;
   completeKakaoLoginWithCode: (code: string) => Promise<AuthSession>;
   session: AuthSession | null;
   status: "loading" | "authenticated" | "unauthenticated";
@@ -55,6 +57,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     return nextSession;
   }, []);
 
+  const completeAppleLoginWithCredential = useCallback(async () => {
+    const nextSession = await completeAppleLogin();
+    setSession(nextSession);
+    return nextSession;
+  }, []);
+
   const clearAuthSession = useCallback(async () => {
     await clearSession();
     setSession(null);
@@ -63,6 +71,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthSessionContextValue>(
     () => ({
       clearAuthSession,
+      completeAppleLoginWithCredential,
       completeKakaoLoginWithCode,
       session,
       status: loading
@@ -71,7 +80,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           ? "authenticated"
           : "unauthenticated",
     }),
-    [clearAuthSession, completeKakaoLoginWithCode, loading, session]
+    [
+      clearAuthSession,
+      completeAppleLoginWithCredential,
+      completeKakaoLoginWithCode,
+      loading,
+      session,
+    ]
   );
 
   return (
