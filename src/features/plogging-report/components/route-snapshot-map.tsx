@@ -25,6 +25,7 @@ const REGION_PADDING_RATIO = 1.4;
 
 // onInitialized 이후 타일이 실제로 그려지기까지 약간의 여유.
 const CAPTURE_DELAY_MS = 600;
+const MAX_CAPTURE_ATTEMPTS = 3;
 
 export function RouteSnapshotMap({
   routePoints,
@@ -35,6 +36,7 @@ export function RouteSnapshotMap({
   const containerRef = useRef<View>(null);
   const capturedRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+  const [captureAttempt, setCaptureAttempt] = useState(0);
 
   useEffect(() => {
     if (!mapReady || capturedRef.current) return;
@@ -63,12 +65,16 @@ export function RouteSnapshotMap({
         }
         // 한 번 실패하더라도 다음 mount 시 재시도할 수 있도록 가드 해제.
         capturedRef.current = false;
-        onCaptureFailed?.(error);
+        if (captureAttempt < MAX_CAPTURE_ATTEMPTS - 1) {
+          setCaptureAttempt((attempt) => attempt + 1);
+        } else {
+          onCaptureFailed?.(error);
+        }
       }
     }, CAPTURE_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [mapReady, onCaptured, onCaptureFailed]);
+  }, [captureAttempt, mapReady, onCaptured, onCaptureFailed]);
 
   const region = computeRegion(routePoints);
 
@@ -118,14 +124,20 @@ function computeRegion(points: RoutePoint[]) {
   const minLng = Math.min(...lngs);
   const maxLng = Math.max(...lngs);
 
-  const latSpan = (maxLat - minLat) * REGION_PADDING_RATIO;
-  const lngSpan = (maxLng - minLng) * REGION_PADDING_RATIO;
+  const latSpan = Math.max(
+    (maxLat - minLat) * REGION_PADDING_RATIO,
+    SINGLE_POINT_DELTA
+  );
+  const lngSpan = Math.max(
+    (maxLng - minLng) * REGION_PADDING_RATIO,
+    SINGLE_POINT_DELTA
+  );
 
   return {
-    latitude: minLat - (latSpan - (maxLat - minLat)) / 2,
-    latitudeDelta: latSpan || SINGLE_POINT_DELTA,
-    longitude: minLng - (lngSpan - (maxLng - minLng)) / 2,
-    longitudeDelta: lngSpan || SINGLE_POINT_DELTA,
+    latitude: (minLat + maxLat) / 2,
+    latitudeDelta: latSpan,
+    longitude: (minLng + maxLng) / 2,
+    longitudeDelta: lngSpan,
   };
 }
 

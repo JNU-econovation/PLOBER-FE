@@ -24,18 +24,19 @@ export async function analyzeTrashPhoto({
   longitude,
 }: AnalyzeTrashPhotoInput): Promise<AnalyzeTrashPhotoResult> {
   try {
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      return {
+        status: "error",
+        message: "사진 분석 요청에는 촬영 위치 좌표가 필요합니다.",
+      };
+    }
+
     const formData = new FormData();
-    formData.append("file", {
+    formData.append("image", {
       name: fileName ?? `plogging-${Date.now()}${extensionFor(contentType)}`,
       type: contentType,
       uri: localUri,
     } as unknown as Blob);
-    if (typeof latitude === "number") {
-      formData.append("latitude", String(latitude));
-    }
-    if (typeof longitude === "number") {
-      formData.append("longitude", String(longitude));
-    }
 
     const session = await getSession();
     const headers: Record<string, string> = {};
@@ -48,13 +49,17 @@ export async function analyzeTrashPhoto({
         contentType,
         fileName,
         hasAuthorization: Boolean(headers.Authorization),
-        hasLatitude: typeof latitude === "number",
-        hasLongitude: typeof longitude === "number",
+        latitude,
+        longitude,
       });
     }
 
+    const url = new URL(ANALYZE_TRASH_PHOTO_PATH, API_BASE_URL);
+    url.searchParams.set("latitude", String(latitude));
+    url.searchParams.set("longitude", String(longitude));
+
     const response = await fetch(
-      new URL(ANALYZE_TRASH_PHOTO_PATH, API_BASE_URL).toString(),
+      url.toString(),
       {
         body: formData,
         headers,
@@ -69,7 +74,7 @@ export async function analyzeTrashPhoto({
           ? `사진 분석 요청 실패 (${response.status}): ${errorText}`
           : `사진 분석 요청 실패 (${response.status})`,
         {
-        status: response.status,
+          status: response.status,
           details: errorText,
         }
       );

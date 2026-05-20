@@ -1,8 +1,6 @@
 import { colors, shadows } from "@/src/shared/theme";
 import {
   BackButton,
-  DecorativeLeafFace,
-  LevelBadge,
   PrimaryBottomButton,
   ScreenRoot,
   StatNumber,
@@ -10,15 +8,32 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuthSession } from "@/src/features/auth";
 import { completePloggingSession } from "@/src/features/plogging-session/api/complete-plogging-session";
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
 
 import { RouteSnapshotMap } from "../components/route-snapshot-map";
 import type { ReportMetric } from "../data/report-data";
+
+const PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT = 70;
+const FLOATING_SHARE_BUTTON_GAP = 18;
+const FLOATING_SHARE_BUTTON_HEIGHT = 43;
+const FLOATING_SHARE_BUTTON_SCROLL_GAP = 24;
+
+type MapImageUploadState = "idle" | "uploading" | "uploaded" | "error";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -51,9 +66,49 @@ function formatHmDuration(totalSeconds: number): string {
   return `${hours}:${pad2(minutes)}`;
 }
 
+function buildShareMessage({
+  caloriesLabel,
+  dateLabel,
+  distanceKm,
+  mapImageUrl,
+  placeName,
+  ploggingTimeLabel,
+  stepCountLabel,
+}: {
+  caloriesLabel: string;
+  dateLabel: string;
+  distanceKm: string;
+  mapImageUrl: string | null;
+  placeName: string;
+  ploggingTimeLabel: string;
+  stepCountLabel: string;
+}): string {
+  const title = [
+    dateLabel,
+    placeName ? `${placeName}에서` : null,
+    "플로깅을 완료했어요.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const lines = [
+    title,
+    `거리 ${distanceKm}km · 시간 ${ploggingTimeLabel}`,
+    `걸음 ${stepCountLabel}steps · 소모 칼로리 ${caloriesLabel}kcal`,
+    "",
+    "오늘도 깨끗한 길을 만들었어요.",
+  ];
+
+  if (mapImageUrl) {
+    lines.push("", `경로 보기: ${mapImageUrl}`);
+  }
+
+  return lines.join("\n");
+}
+
 export function ReportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { session } = useAuthSession();
   const {
     caloriesBurned,
     distanceMeters,
@@ -68,15 +123,29 @@ export function ReportScreen() {
     resetSession,
     restSeconds,
     routePoints,
+    setMapImageObjectUrl,
     startCoord,
     startedAtMs,
     stepCount,
   } = usePloggingSession();
   const [submitting, setSubmitting] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [mapImageUploadState, setMapImageUploadState] =
+    useState<MapImageUploadState>("idle");
   const submittedRef = useRef(false);
+  const shareButtonBottom =
+    insets.bottom + PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT + FLOATING_SHARE_BUTTON_GAP;
 
-  // 지도 이미지 업로드가 진행 중일 수 있으니, "캡처는 됐는데 objectUrl이 아직 없는" 상태인지 본다.
-  const mapImageUploading = mapImageUri !== null && mapImageObjectUrl === null;
+  const hasRouteForMap = routePoints.length > 0;
+  const mapImageCapturePending = hasRouteForMap && mapImageUri === null;
+  const mapImageUploadPending = mapImageUploadState === "uploading";
+  const completeButtonTitle = submitting
+    ? "저장 중..."
+    : mapImageCapturePending
+      ? "지도 이미지 생성 중..."
+      : mapImageUploadPending
+        ? "지도 이미지 업로드 중..."
+        : "플로깅 완료";
 
   // 화면 표시용 값들. 컨텍스트에 값이 없으면 빈 문자열/0으로 떨어진다.
   const dateLabel = formatDateKo(startedAtMs);
@@ -90,12 +159,58 @@ export function ReportScreen() {
     startedAtMs !== null && finishedAtMs !== null
       ? Math.max(0, Math.floor((finishedAtMs - startedAtMs) / 1000) - restSeconds)
       : 0;
+  const stepCountLabel = formatInteger(stepCount);
+  const ploggingTimeLabel = formatHmDuration(ploggingSecondsForView);
+  const caloriesLabel = formatInteger(caloriesBurned);
   const metrics: ReportMetric[] = [
-    { label: "걸음 수", unit: "steps", value: formatInteger(stepCount) },
-    { label: "플로깅 시간", unit: "H:M", value: formatHmDuration(ploggingSecondsForView) },
-    { label: "소모 칼로리", unit: "kcal", value: formatInteger(caloriesBurned) },
+    { label: "걸음 수", unit: "steps", value: stepCountLabel },
+    { label: "플로깅 시간", unit: "H:M", value: ploggingTimeLabel },
+    { label: "소모 칼로리", unit: "kcal", value: caloriesLabel },
     { label: "휴식", unit: "H:M", value: formatHmDuration(restSeconds) },
   ];
+
+  const handleShare = useCallback(async () => {
+    if (sharing) return;
+
+    const message = buildShareMessage({
+      caloriesLabel,
+      dateLabel,
+      distanceKm,
+      mapImageUrl: mapImageObjectUrl,
+      placeName,
+      ploggingTimeLabel,
+      stepCountLabel,
+    });
+
+    setSharing(true);
+    try {
+      await Share.share(
+        {
+          message,
+          title: "플로깅 완료",
+        },
+        {
+          dialogTitle: "플로깅 기록 공유하기",
+          subject: "플로깅 완료",
+        }
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "공유 화면을 열 수 없습니다.";
+      Alert.alert("공유 실패", message);
+    } finally {
+      setSharing(false);
+    }
+  }, [
+    caloriesLabel,
+    dateLabel,
+    distanceKm,
+    mapImageObjectUrl,
+    placeName,
+    ploggingTimeLabel,
+    sharing,
+    stepCountLabel,
+  ]);
 
   const handleComplete = useCallback(async () => {
     if (submittedRef.current || submitting) return;
@@ -104,8 +219,29 @@ export function ReportScreen() {
       Alert.alert("저장 실패", "플로깅 시작 정보가 없습니다.");
       return;
     }
-    if (mapImageUploading) {
-      Alert.alert("잠시만요", "지도 이미지를 업로드하고 있어요. 잠시 후 다시 시도해주세요.");
+    if (!session?.userId) {
+      Alert.alert("저장 실패", "로그인 정보가 없습니다. 다시 로그인해주세요.");
+      return;
+    }
+    if (!hasRouteForMap) {
+      Alert.alert(
+        "저장 실패",
+        "경로 정보가 없어 지도 이미지를 만들 수 없습니다."
+      );
+      return;
+    }
+    if (!mapImageUri) {
+      Alert.alert(
+        "잠시만요",
+        "경로가 그려진 지도 이미지를 생성하고 있어요. 잠시 후 다시 시도해주세요."
+      );
+      return;
+    }
+    if (mapImageUploadPending && !mapImageObjectUrl) {
+      Alert.alert(
+        "잠시만요",
+        "지도 이미지 업로드가 진행 중입니다. 잠시 후 다시 시도해주세요."
+      );
       return;
     }
 
@@ -119,30 +255,47 @@ export function ReportScreen() {
       .map((uri) => photoObjectUrls[uri])
       .filter((url): url is string => Boolean(url));
 
-    const payload = {
-      mode,
-      startedAt: new Date(startedAtMs).toISOString(),
-      finishedAt: new Date(finishedAt).toISOString(),
-      distanceMeters: Math.round(distanceMeters),
-      stepCount,
-      caloriesBurned: Math.round(caloriesBurned),
-      ploggingSeconds,
-      restSeconds,
-      placeName: placeName || "",
-      startLatitude: startCoord?.latitude ?? 0,
-      startLongitude: startCoord?.longitude ?? 0,
-      endLatitude: endCoord?.latitude ?? 0,
-      endLongitude: endCoord?.longitude ?? 0,
-      routePoints,
-      mapImageUrl: mapImageObjectUrl ?? "",
-      photoUrls,
-    };
-    console.log("[plogging-complete] requestBody", JSON.stringify(payload, null, 2));
-
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      await completePloggingSession(payload);
+      let resolvedMapImageUrl = mapImageObjectUrl;
+      if (!resolvedMapImageUrl) {
+        const uploadResult = await uploadMapImage(
+          mapImageUri,
+          session.userId,
+          "image/png"
+        );
+        if (uploadResult.status !== "uploaded") {
+          throw new Error(uploadResult.message);
+        }
+        resolvedMapImageUrl = uploadResult.objectUrl;
+        setMapImageObjectUrl(uploadResult.objectUrl);
+      }
+
+      const payload = {
+        mode,
+        startedAt: new Date(startedAtMs).toISOString(),
+        finishedAt: new Date(finishedAt).toISOString(),
+        distanceMeters: Math.round(distanceMeters),
+        stepCount,
+        caloriesBurned: Math.round(caloriesBurned),
+        ploggingSeconds,
+        restSeconds,
+        placeName: placeName || "",
+        startLatitude: startCoord?.latitude ?? 0,
+        startLongitude: startCoord?.longitude ?? 0,
+        endLatitude: endCoord?.latitude ?? 0,
+        endLongitude: endCoord?.longitude ?? 0,
+        routePoints,
+        mapImageUrl: resolvedMapImageUrl,
+        photoUrls,
+      };
+      console.log("[plogging-complete] requestBody", JSON.stringify(payload, null, 2));
+
+      await completePloggingSession({
+        payload,
+        userId: session.userId,
+      });
       resetSession();
       router.replace("/history");
     } catch (error) {
@@ -160,8 +313,10 @@ export function ReportScreen() {
     distanceMeters,
     endCoord,
     finishedAtMs,
+    hasRouteForMap,
     mapImageObjectUrl,
-    mapImageUploading,
+    mapImageUploadPending,
+    mapImageUri,
     mode,
     photoObjectUrls,
     photoUris,
@@ -170,6 +325,8 @@ export function ReportScreen() {
     restSeconds,
     routePoints,
     router,
+    session?.userId,
+    setMapImageObjectUrl,
     startCoord,
     startedAtMs,
     stepCount,
@@ -183,8 +340,10 @@ export function ReportScreen() {
           styles.content,
           {
             paddingTop: Math.max(insets.top, 44) + 16,
-            // 🌟 하단 PrimaryButton 높이 + Safe Area만큼 스크롤 여백 동적 확보
-            paddingBottom: Math.max(insets.bottom, 30) + 120,
+            paddingBottom:
+              shareButtonBottom +
+              FLOATING_SHARE_BUTTON_HEIGHT +
+              FLOATING_SHARE_BUTTON_SCROLL_GAP,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -195,15 +354,21 @@ export function ReportScreen() {
           placeName={placeName}
           timeRangeLabel={timeRangeLabel}
         />
-        <DistanceSummaryCard distanceKm={distanceKm} />
+        <DistanceSummaryCard
+          distanceKm={distanceKm}
+          onMapImageUploadStateChange={setMapImageUploadState}
+        />
         <ReportMetricsCard metrics={metrics} />
         <PhotoGallery photoUris={photoUris} />
-        <LevelProgressCard />
-        <ShareButton />
       </ScrollView>
+      <ShareButton
+        bottom={shareButtonBottom}
+        disabled={sharing}
+        onPress={handleShare}
+      />
       <PrimaryBottomButton
         onPress={handleComplete}
-        title={submitting ? "저장 중..." : "플로깅 완료"}
+        title={completeButtonTitle}
       />
     </ScreenRoot>
   );
@@ -268,7 +433,14 @@ function ReportTitleBlock({
   );
 }
 
-function DistanceSummaryCard({ distanceKm }: { distanceKm: string }) {
+function DistanceSummaryCard({
+  distanceKm,
+  onMapImageUploadStateChange,
+}: {
+  distanceKm: string;
+  onMapImageUploadStateChange: (state: MapImageUploadState) => void;
+}) {
+  const { session } = useAuthSession();
   const {
     mapImageObjectUrl,
     mapImageUri,
@@ -283,27 +455,47 @@ function DistanceSummaryCard({ distanceKm }: { distanceKm: string }) {
   // 로컬 캡처가 끝나면 백그라운드로 S3 업로드 → objectUrl을 세션에 보관.
   // 같은 URI에 대해 중복 업로드되지 않도록 ref로 가드한다.
   useEffect(() => {
-    if (!mapImageUri) return;
-    if (mapImageObjectUrl) return;
+    if (!mapImageUri) {
+      onMapImageUploadStateChange("idle");
+      return;
+    }
+    if (mapImageObjectUrl) {
+      onMapImageUploadStateChange("uploaded");
+      return;
+    }
     if (uploadedUriRef.current === mapImageUri) return;
     uploadedUriRef.current = mapImageUri;
 
     let cancelled = false;
     void (async () => {
-      const result = await uploadMapImage(mapImageUri, "image/png");
+      if (!session?.userId) {
+        uploadedUriRef.current = null;
+        onMapImageUploadStateChange("idle");
+        return;
+      }
+      onMapImageUploadStateChange("uploading");
+      const result = await uploadMapImage(mapImageUri, session.userId, "image/png");
       if (cancelled) return;
       if (result.status === "uploaded") {
         setMapImageObjectUrl(result.objectUrl);
+        onMapImageUploadStateChange("uploaded");
       } else {
         // 실패 시 다음 mount/재시도에 다시 시도할 수 있도록 가드 해제.
         uploadedUriRef.current = null;
+        onMapImageUploadStateChange("error");
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [mapImageObjectUrl, mapImageUri, setMapImageObjectUrl]);
+  }, [
+    mapImageObjectUrl,
+    mapImageUri,
+    onMapImageUploadStateChange,
+    session?.userId,
+    setMapImageObjectUrl,
+  ]);
 
   return (
     <View style={styles.distanceCard}>
@@ -385,47 +577,40 @@ function PhotoGallery({ photoUris }: { photoUris: string[] }) {
   );
 }
 
-function LevelProgressCard() {
-  return (
-    <View style={styles.levelCard}>
-      <View style={styles.levelInfo}>
-        <View style={styles.levelRow}>
-          <LevelBadge />
-          <Text selectable style={styles.levelTitle}>
-            길거리 수호자
-          </Text>
-        </View>
-        <Text selectable style={styles.levelProgressText}>
-          <Text style={styles.levelProgressMuted}>다음 레벨까지 </Text>
-          21,690걸음
-        </Text>
-        <View style={styles.progressTrack}>
-          <View style={styles.progressFill} />
-          <Text style={styles.progressMarker}>▲</Text>
-        </View>
-      </View>
-      <DecorativeLeafFace />
-    </View>
-  );
-}
-
 // 참고 UI: 메모카드 없이 SNS 공유 버튼만 단독으로 배치한다.
-function ShareButton() {
+function ShareButton({
+  bottom,
+  disabled,
+  onPress,
+}: {
+  bottom: number;
+  disabled: boolean;
+  onPress: () => void;
+}) {
   return (
-    <Pressable
-      accessibilityLabel="SNS 공유하기"
-      accessibilityRole="button"
-      hitSlop={8}
-      style={({ pressed }) => [
-        styles.shareButton,
-        pressed ? styles.pressed : null,
-      ]}
+    <View
+      pointerEvents="box-none"
+      style={[styles.shareButtonOverlay, { bottom }]}
     >
-      <Feather color={colors.icon} name="upload" size={19} />
-      <Text selectable style={styles.shareText}>
-        SNS 공유하기
-      </Text>
-    </Pressable>
+      <Pressable
+        accessibilityLabel="SNS 공유하기"
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        hitSlop={8}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.shareButton,
+          pressed ? styles.pressed : null,
+          disabled ? styles.disabled : null,
+        ]}
+      >
+        <Feather color={colors.icon} name="upload" size={19} />
+        <Text selectable style={styles.shareText}>
+          SNS 공유하기
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -470,6 +655,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  disabled: {
+    opacity: 0.5,
+  },
   headerActions: {
     alignItems: "center",
     flexDirection: "row",
@@ -483,39 +671,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 34,
     ...shadows.soft,
-  },
-  levelCard: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    flexDirection: "row",
-    height: 104,
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    ...shadows.soft,
-  },
-  levelInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  levelProgressMuted: {
-    color: colors.subtle,
-  },
-  levelProgressText: {
-    color: colors.text,
-    fontSize: 10,
-    fontWeight: "500",
-    letterSpacing: 0,
-  },
-  levelRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-  },
-  levelTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: "600",
   },
   metricCell: {
     gap: 8,
@@ -576,26 +731,6 @@ const styles = StyleSheet.create({
     opacity: 0.72,
     transform: [{ scale: 0.98 }],
   },
-  progressFill: {
-    backgroundColor: colors.primary,
-    borderRadius: 7,
-    height: 5,
-    width: "82%",
-  },
-  progressMarker: {
-    bottom: -14,
-    color: colors.primary,
-    fontSize: 10,
-    position: "absolute",
-    right: "16%",
-  },
-  progressTrack: {
-    backgroundColor: colors.line,
-    borderRadius: 7,
-    height: 5,
-    overflow: "visible",
-    width: "88%",
-  },
   reportSubTitle: {
     color: colors.text,
     fontSize: 12,
@@ -616,17 +751,22 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     alignItems: "center",
-    alignSelf: "center",
     backgroundColor: colors.background,
     borderColor: colors.primary,
     borderRadius: 27,
     borderWidth: 1.5,
     flexDirection: "row",
     gap: 10,
-    marginTop: 4,
-    minHeight: 39,
+    height: FLOATING_SHARE_BUTTON_HEIGHT,
     paddingHorizontal: 23,
     ...shadows.soft,
+  },
+  shareButtonOverlay: {
+    alignItems: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    zIndex: 2,
   },
   shareText: {
     color: colors.text,

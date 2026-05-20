@@ -22,13 +22,13 @@ export function useMonthlyPloggingSummary({
   year,
   month,
 }: Options): MonthlyPloggingSummaryState {
-  const { status: authStatus } = useAuthSession();
+  const { session, status: authStatus } = useAuthSession();
   const [state, setState] = useState<MonthlyPloggingSummaryState>({
     status: "idle",
   });
 
   useEffect(() => {
-    if (authStatus !== "authenticated") {
+    if (authStatus !== "authenticated" || !session?.userId) {
       setState({ status: "idle" });
       return;
     }
@@ -36,7 +36,7 @@ export function useMonthlyPloggingSummary({
     let mounted = true;
     setState({ status: "loading" });
 
-    getMonthlyPloggingSummary({ year, month })
+    getMonthlyPloggingSummary({ month, userId: session.userId, year })
       .then((summary) => {
         if (!mounted) return;
         setState({ status: "success", summary });
@@ -55,7 +55,7 @@ export function useMonthlyPloggingSummary({
     return () => {
       mounted = false;
     };
-  }, [authStatus, year, month]);
+  }, [authStatus, month, session?.userId, year]);
 
   return state;
 }
