@@ -4,7 +4,7 @@ import { useDeviceLocation } from "@/src/shared/location";
 
 import type { HotspotPolygon } from "../components/types";
 import {
-  getHotspotPolygonsNear,
+  getHotspotPolygonsNearProgressive,
   getHotspotTileKey,
 } from "../services/hotspot-tiles";
 
@@ -23,11 +23,13 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
 
   useEffect(() => {
     if (!enabled) {
+      logHotspotHookDebug("disabled");
       setState({ polygons: [], status: "idle" });
       fetchedKeyRef.current = null;
       return;
     }
     if (permission === "denied" || permission === "unavailable") {
+      logHotspotHookDebug("permission-blocked", { permission });
       setState({
         message: "위치 권한이 필요합니다.",
         polygons: [],
@@ -36,25 +38,49 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
       return;
     }
     if (!position) {
+      logHotspotHookDebug("waiting-position", { permission });
       setState((prev) => ({ polygons: prev.polygons, status: "loading" }));
       return;
     }
 
     const key = getHotspotTileKey(position);
-    if (fetchedKeyRef.current === key) return;
+    if (fetchedKeyRef.current === key) {
+      logHotspotHookDebug("skip-same-tile", { key, position });
+      return;
+    }
     fetchedKeyRef.current = key;
 
     let mounted = true;
+    logHotspotHookDebug("load-start", { key, position });
     setState((prev) => ({ polygons: prev.polygons, status: "loading" }));
 
-    getHotspotPolygonsNear(position)
+    getHotspotPolygonsNearProgressive(position, (polygons, phase) => {
+      if (!mounted) return;
+      logHotspotHookDebug("load-progress", {
+        key,
+        phase,
+        polygonCount: polygons.length,
+      });
+      setState({ polygons, status: phase === "complete" ? "success" : "loading" });
+    })
       .then((polygons) => {
         if (!mounted) return;
+        logHotspotHookDebug("load-success", {
+          key,
+          polygonCount: polygons.length,
+        });
         setState({ polygons, status: "success" });
       })
       .catch((error) => {
         if (!mounted) return;
         fetchedKeyRef.current = null;
+        logHotspotHookDebug("load-error", {
+          key,
+          message:
+            error instanceof Error
+              ? error.message
+              : "히트맵을 불러오지 못했습니다.",
+        });
         setState({
           message:
             error instanceof Error
@@ -71,4 +97,12 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
   }, [enabled, permission, position]);
 
   return state;
+}
+
+function logHotspotHookDebug(
+  message: string,
+  payload?: Record<string, unknown>
+) {
+  if (!__DEV__) return;
+  console.log(`[hotspot-hook] ${message}`, payload ?? {});
 }

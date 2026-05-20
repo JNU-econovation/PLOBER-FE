@@ -16,7 +16,9 @@ export type ToiletMarker = {
 };
 
 export type HotspotPolygon = {
+  blobCoords: { latitude: number; longitude: number }[];
   id: string;
+  center: { latitude: number; longitude: number };
   coords: { latitude: number; longitude: number }[];
   trashScore: number;
 };
