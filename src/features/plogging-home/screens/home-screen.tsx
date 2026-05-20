@@ -5,14 +5,15 @@ import {
   MapControls,
   ModeSwitch,
   ScreenRoot,
+  TimeStepper,
   useTabBarHeight,
   type PloggingMode,
 } from "@/src/shared/ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context"; // 추가
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { usePloggingSession } from "@/src/features/plogging-session";
 import {
@@ -26,10 +27,21 @@ import {
 const START_BUTTON_HEIGHT = 96;
 const FADE_GRADIENT_HEIGHT = 80;
 
+// AI 모드 시간 설정 영역 관련 상수
+const TIME_SETTING_HEIGHT = 92; // "플로깅 설정" 라벨 + TimeStepper + 위아래 여백
+const TIME_SETTING_GAP_TO_START = 14; // TimeStepper 하단과 시작 버튼 상단 사이 간격
+
+// 기본/최소/최대 시간 (분)
+const DEFAULT_TIME_MINUTES = 30;
+const MIN_TIME_MINUTES = 10;
+const MAX_TIME_MINUTES = 120;
+const TIME_STEP_MINUTES = 5;
+
 export function HomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets(); // Safe Area 훅 추가
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<PloggingMode>("ai");
+  const [timeMinutes, setTimeMinutes] = useState<number>(DEFAULT_TIME_MINUTES);
   const [restroomVisible, setRestroomVisible] = useState(false);
   const { setMode: setSessionMode } = usePloggingSession();
   const trashBinsState = useNearbyTrashBins();
@@ -58,27 +70,46 @@ export function HomeScreen() {
     // AI 모드는 ai-route 화면에서 경로 선택 후에 확정된다.
     if (mode === "free") {
       setSessionMode("FREE");
+      router.push("/plogging");
+      return;
     }
-    router.push(mode === "ai" ? "/ai-route" : "/plogging");
+
+    // AI 모드: 추후 이슈에서 lat/lon/time/mode 파라미터를 ai-route에 전달하도록 확장한다.
+    // 현재는 시간만 params로 임시 전달한다. (lat/lon은 ai-route에서 GPS로 직접 가져온다)
+    router.push({
+      pathname: "/ai-route",
+      params: { time: String(timeMinutes) },
+    });
   };
-  // Android에서는 시스템 내비게이션 바 inset을 더해 겹침을 방지한다.
+
   const tabBarHeight = useTabBarHeight();
-  // 시안 기준 탭바 위 간격을 그대로 유지(safe-area 기기에서도 동일한 시각 비율)
+  // 시안 기준 탭바 위 간격
   const startButtonOffset = 41;
   const reportButtonOffset = 63;
   const reportLabelOffset = 131;
 
   // 솔리드 흰색 구간: 탭바 위 → 시작 버튼 위쪽으로 같은 간격까지
-  const fadeSolidHeight =
+  // AI 모드일 때는 시간 설정 영역만큼 위로 더 확장한다.
+  const baseSolidHeight =
     startButtonOffset + START_BUTTON_HEIGHT + startButtonOffset;
+  const fadeSolidHeight =
+    mode === "ai"
+      ? baseSolidHeight + TIME_SETTING_HEIGHT + TIME_SETTING_GAP_TO_START
+      : baseSolidHeight;
   const fadeTotalHeight = fadeSolidHeight + FADE_GRADIENT_HEIGHT;
   const solidStopRatio = FADE_GRADIENT_HEIGHT / fadeTotalHeight;
+
+  // 시간 설정 영역 bottom 위치: 시작 버튼 위쪽 + 시작 버튼과 시간 설정 영역 사이 간격
+  const timeSettingBottom =
+    tabBarHeight +
+    startButtonOffset +
+    START_BUTTON_HEIGHT +
+    TIME_SETTING_GAP_TO_START;
 
   return (
     <ScreenRoot>
       <PloggingMap dimmed toilets={toiletMarkers} trashBins={trashBinMarkers}>
         <ModeSwitch onChange={setMode} value={mode} />
-        {/* 우측 맵 컨트롤 버튼들도 노치 아래로 내려줍니다 */}
         <MapControls
           onToggleRestroom={() => setRestroomVisible((prev) => !prev)}
           restroomActive={restroomVisible}
@@ -98,6 +129,24 @@ export function HomeScreen() {
             { bottom: tabBarHeight, height: fadeTotalHeight },
           ]}
         />
+
+        {mode === "ai" ? (
+          <View
+            pointerEvents="box-none"
+            style={[styles.timeSettingBlock, { bottom: timeSettingBottom }]}
+          >
+            <Text selectable style={styles.timeSettingTitle}>
+              플로깅 설정
+            </Text>
+            <TimeStepper
+              max={MAX_TIME_MINUTES}
+              min={MIN_TIME_MINUTES}
+              onChange={setTimeMinutes}
+              step={TIME_STEP_MINUTES}
+              value={timeMinutes}
+            />
+          </View>
+        ) : null}
 
         <Text
           selectable
@@ -182,6 +231,19 @@ const styles = StyleSheet.create({
   startText: {
     color: colors.surface,
     fontSize: 22,
+    fontWeight: "500",
+    letterSpacing: 0,
+  },
+  timeSettingBlock: {
+    alignItems: "center",
+    gap: 12,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  timeSettingTitle: {
+    color: colors.text,
+    fontSize: 14,
     fontWeight: "500",
     letterSpacing: 0,
   },
