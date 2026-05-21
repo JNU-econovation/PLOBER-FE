@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -42,6 +43,7 @@ import {
 } from "../services";
 
 const MAX_EXPERIENCE_PROGRESS = 100;
+const PHOTO_LIBRARY_PERMISSION_ERROR = "사진 접근 권한이 필요합니다.";
 
 type AccountAction = "logout" | "delete" | null;
 
@@ -69,6 +71,59 @@ function getImagePickerModule() {
   }
 
   return imagePickerModule;
+}
+
+async function ensurePhotoLibraryPermission(
+  imagePicker: typeof ExpoImagePicker
+): Promise<boolean> {
+  if (Platform.OS === "web") return true;
+
+  const currentPermission =
+    await imagePicker.getMediaLibraryPermissionsAsync();
+  if (
+    currentPermission.granted ||
+    currentPermission.accessPrivileges === "limited"
+  ) {
+    return true;
+  }
+
+  if (!currentPermission.canAskAgain) {
+    showPhotoLibrarySettingsAlert();
+    return false;
+  }
+
+  const requestedPermission =
+    await imagePicker.requestMediaLibraryPermissionsAsync();
+  if (
+    requestedPermission.granted ||
+    requestedPermission.accessPrivileges === "limited"
+  ) {
+    return true;
+  }
+
+  if (!requestedPermission.canAskAgain) {
+    showPhotoLibrarySettingsAlert();
+  }
+
+  return false;
+}
+
+function showPhotoLibrarySettingsAlert() {
+  Alert.alert(
+    "사진 접근 권한이 필요합니다",
+    "프로필 이미지를 변경하려면 설정에서 사진 접근 권한을 허용해주세요.",
+    [
+      { style: "cancel", text: "취소" },
+      {
+        text: "설정 열기",
+        onPress: () => {
+          Linking.openSettings().catch(() => {
+            // 설정 앱 진입 실패는 무시하고 화면 오류 메시지만 유지한다.
+          });
+        },
+      },
+    ]
+  );
 }
 
 export function ProfileScreen() {
@@ -235,12 +290,10 @@ export function ProfileScreen() {
         );
       }
 
-      if (Platform.OS !== "web") {
-        const permission =
-          await imagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          throw new Error("사진 접근 권한이 필요합니다.");
-        }
+      const hasPhotoLibraryPermission =
+        await ensurePhotoLibraryPermission(imagePicker);
+      if (!hasPhotoLibraryPermission) {
+        throw new Error(PHOTO_LIBRARY_PERMISSION_ERROR);
       }
 
       const pickerResult = await imagePicker.launchImageLibraryAsync({
