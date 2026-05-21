@@ -3,7 +3,7 @@ import 'dotenv/config';
 
 export default ({ config }) => ({
   ...config,
-  name: "NaverMapPloggingApp",
+  name: "플로버",
   slug: "NaverMapPloggingApp",
   version: "1.0.0",
   orientation: "portrait",
@@ -13,13 +13,13 @@ export default ({ config }) => ({
   newArchEnabled: true,
   
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: "com.econovation.plover",
     usesAppleSignIn: true,
     // iOS 위치 권한 메시지 추가
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
-      CFBundleDisplayName: "this is plogging app",
+      CFBundleDisplayName: "플로버",
       ITSAppUsesNonExemptEncryption: false,
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
       NSMotionUsageDescription: "플로깅 중 걸음 수를 측정하기 위해 동작 인식 권한이 필요합니다.",

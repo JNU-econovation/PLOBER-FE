@@ -6,6 +6,7 @@ import {
 import { colors, shadows, typography } from "@/src/shared/theme";
 import { ScreenRoot } from "@/src/shared/ui";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import type * as ExpoImagePicker from "expo-image-picker";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { useEffect, useState } from "react";
@@ -71,6 +72,7 @@ function getImagePickerModule() {
 }
 
 export function ProfileScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const contentTopPadding =
     Platform.OS === "ios" ? Math.max(insets.top, 12) + 8 : 8;
@@ -438,6 +440,10 @@ export function ProfileScreen() {
           onDeleteAccount={handleDeleteAccount}
           onLogout={handleLogout}
         />
+        <LegalLinks
+          onOpenPrivacy={() => router.push("/privacy")}
+          onOpenSupport={() => router.push("/support")}
+        />
       </ScrollView>
       <NicknameEditModal
         errorMessage={nicknameError}
@@ -783,6 +789,48 @@ function AccountActions({
   );
 }
 
+function LegalLinks({
+  onOpenPrivacy,
+  onOpenSupport,
+}: {
+  onOpenPrivacy: () => void;
+  onOpenSupport: () => void;
+}) {
+  return (
+    <View style={styles.legalLinks}>
+      <Pressable
+        accessibilityLabel="개인정보 처리방침"
+        accessibilityRole="link"
+        onPress={onOpenPrivacy}
+        style={({ pressed }) => [
+          styles.legalLinkButton,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        <Feather color={colors.muted} name="shield" size={16} />
+        <Text selectable style={styles.legalLinkText}>
+          개인정보 처리방침
+        </Text>
+      </Pressable>
+      <View style={styles.legalDivider} />
+      <Pressable
+        accessibilityLabel="문의 및 지원"
+        accessibilityRole="link"
+        onPress={onOpenSupport}
+        style={({ pressed }) => [
+          styles.legalLinkButton,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        <Feather color={colors.muted} name="help-circle" size={16} />
+        <Text selectable style={styles.legalLinkText}>
+          문의 및 지원
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   accountActions: {
     gap: 10,
@@ -911,6 +959,31 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: "500",
+    letterSpacing: 0,
+  },
+  legalDivider: {
+    backgroundColor: colors.line,
+    height: 14,
+    width: 1,
+  },
+  legalLinkButton: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 4,
+  },
+  legalLinks: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  legalLinkText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "600",
     letterSpacing: 0,
   },
   logoutButton: {

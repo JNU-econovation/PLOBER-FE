@@ -15,6 +15,8 @@
 - Apple Sign In is enabled through `usesAppleSignIn`.
 - Camera, photo library, location, and motion usage descriptions are configured in `app.config.js`.
 - App Transport Security exceptions include the backend API host and hotspot tile host because both are currently HTTP endpoints.
+- iPad support is disabled for the initial iOS submission, so App Store screenshots can focus on iPhone.
+- Privacy policy and support screens are available in-app from both the login and profile screens.
 
 ## Verification Commands
 
@@ -48,6 +50,8 @@ npx eas-cli@latest submit -p ios --profile production
 - Create or confirm the App Store Connect app record for bundle ID `com.econovation.plover`.
 - Configure Apple Developer team credentials with `npx eas-cli@latest credentials -p ios`.
 - Add App Store metadata: app name, subtitle, description, keywords, support URL, privacy policy URL, screenshots, and age rating.
-- Complete App Privacy details for location, photos, camera, motion, authentication, and any analytics actually used.
+- Complete App Privacy details for location, photos, camera, motion/fitness, authentication, profile data, plogging records, and any analytics actually used.
+- Publish the same privacy policy content at a public URL and set that URL in App Store Connect.
 - Test the HTTP API endpoints on a physical iPhone build because ATS exceptions and native map overlays cannot be fully validated in web.
 - Confirm `com.econovation.plover` is the final production bundle identifier before public release.
+- Create a new production build after the latest app name, legal-link, and iPhone-only configuration changes.

@@ -183,9 +183,55 @@ export function LoginScreen() {
               {appleLoginErrorMessage}
             </Text>
           ) : null}
+          <LegalFooter
+            onOpenPrivacy={() => router.push("/privacy")}
+            onOpenSupport={() => router.push("/support")}
+          />
         </View>
       </View>
     </ScreenRoot>
+  );
+}
+
+function LegalFooter({
+  onOpenPrivacy,
+  onOpenSupport,
+}: {
+  onOpenPrivacy: () => void;
+  onOpenSupport: () => void;
+}) {
+  return (
+    <View style={styles.legalFooter}>
+      <Pressable
+        accessibilityLabel="개인정보 처리방침"
+        accessibilityRole="link"
+        hitSlop={6}
+        onPress={onOpenPrivacy}
+        style={({ pressed }) => [
+          styles.legalFooterButton,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        <Text selectable style={styles.legalFooterText}>
+          개인정보 처리방침
+        </Text>
+      </Pressable>
+      <View style={styles.legalFooterDivider} />
+      <Pressable
+        accessibilityLabel="문의 및 지원"
+        accessibilityRole="link"
+        hitSlop={6}
+        onPress={onOpenSupport}
+        style={({ pressed }) => [
+          styles.legalFooterButton,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        <Text selectable style={styles.legalFooterText}>
+          문의 및 지원
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -229,6 +275,29 @@ const styles = StyleSheet.create({
     color: "#111111",
     fontSize: 17,
     fontWeight: "700",
+    letterSpacing: 0,
+  },
+  legalFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  legalFooterButton: {
+    justifyContent: "center",
+    minHeight: 32,
+    paddingHorizontal: 4,
+  },
+  legalFooterDivider: {
+    backgroundColor: colors.line,
+    height: 13,
+    width: 1,
+  },
+  legalFooterText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "600",
     letterSpacing: 0,
   },
   logoFace: {

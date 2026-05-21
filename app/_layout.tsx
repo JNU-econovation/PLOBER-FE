@@ -30,6 +30,8 @@ function RootStack() {
       <Stack.Screen name="kakao-login" />
       <Stack.Screen name="kakao-redirect" />
       <Stack.Screen name="kakao/callback" />
+      <Stack.Screen name="privacy" />
+      <Stack.Screen name="support" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="ai-route" />
       <Stack.Screen name="plogging" />
@@ -48,6 +50,7 @@ function AuthGate({ children }: { children: ReactNode }) {
     segments[0] === "kakao-login" ||
     segments[0] === "kakao-redirect" ||
     segments[0] === "kakao";
+  const onPublicRoute = segments[0] === "privacy" || segments[0] === "support";
 
   if (status === "loading") {
     return (
@@ -57,7 +60,7 @@ function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "unauthenticated" && !onAuthRoute) {
+  if (status === "unauthenticated" && !onAuthRoute && !onPublicRoute) {
     return <Redirect href="/login" />;
   }
 
