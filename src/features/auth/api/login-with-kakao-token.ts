@@ -3,7 +3,7 @@ import { API_BASE_URL } from "@/src/shared/constants/env";
 
 import type { KakaoLoginRequest, KakaoLoginResponse } from "./types";
 
-const KAKAO_LOGIN_PATH = "/api/v2/kakao/login";
+const KAKAO_LOGIN_PATH = "/api/auth/v2/kakao/login";
 
 type ServerErrorBody = {
   code?: string;

@@ -120,6 +120,18 @@ export default ({ config }) => ({
         client_id: process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID,
       },
     ],
+    [
+      "@react-native-kakao/core",
+      {
+        nativeAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
+        android: {
+          authCodeHandlerActivity: true,
+        },
+        ios: {
+          handleKakaoOpenUrl: true,
+        },
+      },
+    ],
   ],
   extra: {
     ...config.extra,
