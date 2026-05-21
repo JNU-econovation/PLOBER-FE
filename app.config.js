@@ -57,11 +57,14 @@ export default ({ config }) => ({
     usesCleartextTraffic: true,
     predictiveBackGestureEnabled: false,
     package: "com.econovation.plover",
-    // Android 권한: 포그라운드 위치 + 만보기
+    // Android 권한: 위치/만보기 + 카메라/사진 선택
     permissions: [
       "ACCESS_COARSE_LOCATION",
       "ACCESS_FINE_LOCATION",
       "ACTIVITY_RECOGNITION",
+      "CAMERA",
+      "READ_EXTERNAL_STORAGE",
+      "WRITE_EXTERNAL_STORAGE",
     ],
   },
   
@@ -88,6 +91,7 @@ export default ({ config }) => ({
       {
         photosPermission: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
         cameraPermission: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
+        microphonePermission: false,
       },
     ],
     [

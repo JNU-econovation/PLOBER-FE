@@ -683,11 +683,6 @@ function DistanceSummaryCard({
       </Text>
       <View style={styles.distanceHeader}>
         <StatNumber size={36} unit="km" value={distanceKm} />
-        <View style={styles.avgPill}>
-          <Text selectable style={styles.avgText}>
-            주간 평균 0.4km▲
-          </Text>
-        </View>
       </View>
       <View style={styles.miniMap}>
         {mapImageUri ? (
@@ -916,22 +911,6 @@ function ShareButton({
 }
 
 const styles = StyleSheet.create({
-  avgPill: {
-    alignItems: "center",
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
-    borderRadius: 24,
-    borderWidth: 1,
-    justifyContent: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  avgText: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0,
-  },
   cardCaption: {
     color: colors.subtle,
     fontSize: 14,
