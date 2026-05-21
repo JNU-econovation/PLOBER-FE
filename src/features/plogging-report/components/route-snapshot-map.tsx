@@ -124,20 +124,26 @@ function computeRegion(points: RoutePoint[]) {
   const minLng = Math.min(...lngs);
   const maxLng = Math.max(...lngs);
 
-  const latSpan = Math.max(
-    (maxLat - minLat) * REGION_PADDING_RATIO,
+  const rawLatSpan = maxLat - minLat;
+  const rawLngSpan = maxLng - minLng;
+  const latitudeDelta = Math.max(
+    rawLatSpan * REGION_PADDING_RATIO,
     SINGLE_POINT_DELTA
   );
-  const lngSpan = Math.max(
-    (maxLng - minLng) * REGION_PADDING_RATIO,
+  const longitudeDelta = Math.max(
+    rawLngSpan * REGION_PADDING_RATIO,
     SINGLE_POINT_DELTA
   );
+  const centerLatitude = (minLat + maxLat) / 2;
+  const centerLongitude = (minLng + maxLng) / 2;
 
+  // @mj-studio/react-native-naver-map의 Region은 중심 좌표가 아니라
+  // south-west(좌하단) 좌표 + delta를 받는다.
   return {
-    latitude: (minLat + maxLat) / 2,
-    latitudeDelta: latSpan,
-    longitude: (minLng + maxLng) / 2,
-    longitudeDelta: lngSpan,
+    latitude: centerLatitude - latitudeDelta / 2,
+    latitudeDelta,
+    longitude: centerLongitude - longitudeDelta / 2,
+    longitudeDelta,
   };
 }
 
