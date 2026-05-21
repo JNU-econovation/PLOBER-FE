@@ -37,6 +37,7 @@ const FLOATING_SHARE_BUTTON_SCROLL_GAP = 24;
 const SHARE_PREVIEW_WIDTH = 390;
 
 type MapImageUploadState = "idle" | "uploading" | "uploaded" | "error";
+type MapImageCaptureState = "idle" | "capturing" | "captured" | "error";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -185,20 +186,33 @@ export function ReportScreen() {
   const [sharing, setSharing] = useState(false);
   const [mapImageUploadState, setMapImageUploadState] =
     useState<MapImageUploadState>("idle");
+  const [mapImageCaptureState, setMapImageCaptureState] =
+    useState<MapImageCaptureState>("idle");
   const submittedRef = useRef(false);
   const sharePreviewRef = useRef<View>(null);
   const shareButtonBottom =
     insets.bottom + PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT + FLOATING_SHARE_BUTTON_GAP;
 
   const hasRouteForMap = routePoints.length > 0;
-  const mapImageCapturePending = hasRouteForMap && mapImageUri === null;
+  const mapImageCaptureFailed =
+    hasRouteForMap &&
+    mapImageUri === null &&
+    mapImageCaptureState === "error";
+  const mapImageCapturePending =
+    hasRouteForMap && mapImageUri === null && !mapImageCaptureFailed;
   const mapImageUploadPending = mapImageUploadState === "uploading";
+  const mapImageUploadFailed =
+    mapImageUploadState === "error" && mapImageObjectUrl === null;
   const completeButtonTitle = submitting
     ? "저장 중..."
+    : mapImageCaptureFailed
+      ? "지도 이미지 생성 실패"
     : mapImageCapturePending
       ? "지도 이미지 생성 중..."
-      : mapImageUploadPending
-        ? "지도 이미지 업로드 중..."
+    : mapImageUploadPending
+      ? "지도 이미지 업로드 중..."
+      : mapImageUploadFailed
+        ? "지도 이미지 업로드 재시도"
         : "플로깅 완료";
 
   // 화면 표시용 값들. 컨텍스트에 값이 없으면 빈 문자열/0으로 떨어진다.
@@ -229,6 +243,13 @@ export function ReportScreen() {
     if (sharing) return;
 
     if (hasRouteForMap && !shareMapImageUri) {
+      if (mapImageCaptureFailed) {
+        Alert.alert(
+          "공유 실패",
+          "경로 지도 이미지를 만들지 못했습니다. 지도 영역에서 다시 시도해주세요."
+        );
+        return;
+      }
       Alert.alert(
         "공유 준비 중",
         "경로가 그려진 공유 이미지를 만들고 있어요. 잠시 후 다시 시도해주세요."
@@ -274,6 +295,7 @@ export function ReportScreen() {
     dateLabel,
     distanceKm,
     hasRouteForMap,
+    mapImageCaptureFailed,
     mapImageObjectUrl,
     placeName,
     ploggingTimeLabel,
@@ -297,6 +319,13 @@ export function ReportScreen() {
       Alert.alert(
         "저장 실패",
         "경로 정보가 없어 지도 이미지를 만들 수 없습니다."
+      );
+      return;
+    }
+    if (mapImageCaptureFailed) {
+      Alert.alert(
+        "저장 실패",
+        "경로 지도 이미지를 만들지 못했습니다. 지도 영역에서 다시 시도해주세요."
       );
       return;
     }
@@ -360,7 +389,14 @@ export function ReportScreen() {
         mapImageUrl: resolvedMapImageUrl,
         photoUrls,
       };
-      console.log("[plogging-complete] requestBody", JSON.stringify(payload, null, 2));
+      if (__DEV__) {
+        console.log("[plogging-complete] requestBody", {
+          ...payload,
+          mapImageUrl: Boolean(payload.mapImageUrl),
+          photoUrls: `${payload.photoUrls.length} photos`,
+          routePoints: `${payload.routePoints.length} points`,
+        });
+      }
 
       await completePloggingSession({
         payload,
@@ -384,6 +420,7 @@ export function ReportScreen() {
     endCoord,
     finishedAtMs,
     hasRouteForMap,
+    mapImageCaptureFailed,
     mapImageObjectUrl,
     mapImageUploadPending,
     mapImageUri,
@@ -426,6 +463,7 @@ export function ReportScreen() {
         />
         <DistanceSummaryCard
           distanceKm={distanceKm}
+          onMapImageCaptureStateChange={setMapImageCaptureState}
           onMapImageUploadStateChange={setMapImageUploadState}
         />
         <ReportMetricsCard metrics={metrics} />
@@ -522,9 +560,11 @@ function ReportTitleBlock({
 
 function DistanceSummaryCard({
   distanceKm,
+  onMapImageCaptureStateChange,
   onMapImageUploadStateChange,
 }: {
   distanceKm: string;
+  onMapImageCaptureStateChange: (state: MapImageCaptureState) => void;
   onMapImageUploadStateChange: (state: MapImageUploadState) => void;
 }) {
   const { session } = useAuthSession();
@@ -537,7 +577,59 @@ function DistanceSummaryCard({
   } = usePloggingSession();
   // 좌표가 1개라도 있으면 마커로 캡처, 0개일 때만 placeholder.
   const hasRoute = routePoints.length >= 1;
+  const [mapImageCaptureState, setMapImageCaptureState] =
+    useState<MapImageCaptureState>("idle");
+  const [captureRetryKey, setCaptureRetryKey] = useState(0);
   const uploadedUriRef = useRef<string | null>(null);
+
+  const updateMapImageCaptureState = useCallback(
+    (state: MapImageCaptureState) => {
+      setMapImageCaptureState(state);
+      onMapImageCaptureStateChange(state);
+    },
+    [onMapImageCaptureStateChange]
+  );
+
+  useEffect(() => {
+    let nextState: MapImageCaptureState | null = null;
+
+    if (!hasRoute) {
+      nextState = "idle";
+    } else if (mapImageUri) {
+      nextState = "captured";
+    } else if (
+      mapImageCaptureState !== "capturing" &&
+      mapImageCaptureState !== "error"
+    ) {
+      nextState = "capturing";
+    }
+
+    if (nextState !== null && nextState !== mapImageCaptureState) {
+      updateMapImageCaptureState(nextState);
+    }
+  }, [
+    hasRoute,
+    mapImageCaptureState,
+    mapImageUri,
+    updateMapImageCaptureState,
+  ]);
+
+  const handleMapCaptured = useCallback(
+    (uri: string) => {
+      setMapImageUri(uri);
+      updateMapImageCaptureState("captured");
+    },
+    [setMapImageUri, updateMapImageCaptureState]
+  );
+
+  const handleMapCaptureFailed = useCallback(() => {
+    updateMapImageCaptureState("error");
+  }, [updateMapImageCaptureState]);
+
+  const handleRetryMapCapture = useCallback(() => {
+    updateMapImageCaptureState("capturing");
+    setCaptureRetryKey((key) => key + 1);
+  }, [updateMapImageCaptureState]);
 
   // 로컬 캡처가 끝나면 백그라운드로 S3 업로드 → objectUrl을 세션에 보관.
   // 같은 URI에 대해 중복 업로드되지 않도록 ref로 가드한다.
@@ -604,9 +696,31 @@ function DistanceSummaryCard({
             source={{ uri: mapImageUri }}
             style={styles.miniMapImage}
           />
+        ) : hasRoute && mapImageCaptureState === "error" ? (
+          <View style={styles.miniMapEmpty}>
+            <Text selectable style={styles.miniMapEmptyText}>
+              지도 이미지를 만들 수 없습니다.
+            </Text>
+            <Pressable
+              accessibilityLabel="지도 이미지 다시 만들기"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={handleRetryMapCapture}
+              style={({ pressed }) => [
+                styles.miniMapRetryButton,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <Text selectable style={styles.miniMapRetryText}>
+                다시 시도
+              </Text>
+            </Pressable>
+          </View>
         ) : hasRoute ? (
           <RouteSnapshotMap
-            onCaptured={setMapImageUri}
+            key={captureRetryKey}
+            onCaptured={handleMapCaptured}
+            onCaptureFailed={handleMapCaptureFailed}
             routePoints={routePoints}
           />
         ) : (
@@ -901,6 +1015,21 @@ const styles = StyleSheet.create({
     color: colors.subtle,
     fontSize: 13,
     fontWeight: "500",
+  },
+  miniMapRetryButton: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 18,
+    justifyContent: "center",
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  miniMapRetryText: {
+    color: colors.surface,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0,
   },
   // 인증샷 갤러리: 한 행에 4칸이 꽉 차게, 사진 사이는 살짝 간격을 둔다.
   photoGallery: {
