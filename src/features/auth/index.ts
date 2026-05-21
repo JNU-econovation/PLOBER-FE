@@ -1,4 +1,4 @@
-export { loginWithAppleToken, loginWithKakaoCode, logout } from "./api";
+export { loginWithAppleToken, loginWithKakaoToken, logout } from "./api";
 export { AuthSessionProvider, useAuthSession } from "./hooks/use-auth-session";
 export { KakaoLoginRedirectScreen } from "./screens/kakao-login-redirect-screen";
 export { KakaoLoginWebviewScreen } from "./screens/kakao-login-webview-screen";
