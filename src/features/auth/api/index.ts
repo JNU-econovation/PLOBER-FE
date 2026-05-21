@@ -1,5 +1,5 @@
 export { loginWithAppleToken } from "./login-with-apple-token";
-export { loginWithKakaoCode } from "./login-with-kakao-code";
+export { loginWithKakaoToken } from "./login-with-kakao-token";
 export { logout } from "./logout";
 export type {
   AppleLoginRequest,

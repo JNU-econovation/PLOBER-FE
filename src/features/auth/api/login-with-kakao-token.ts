@@ -3,7 +3,7 @@ import { API_BASE_URL } from "@/src/shared/constants/env";
 
 import type { KakaoLoginRequest, KakaoLoginResponse } from "./types";
 
-const KAKAO_LOGIN_PATH = "/api/auth/kakao/login";
+const KAKAO_LOGIN_PATH = "/api/v2/kakao/login";
 
 type ServerErrorBody = {
   code?: string;
@@ -11,21 +11,38 @@ type ServerErrorBody = {
   status?: number;
 };
 
-export async function loginWithKakaoCode(
-  code: string
+function resolveErrorMessage(
+  status: number,
+  body: ServerErrorBody | null
+): string {
+  if (status === 401) {
+    if (body?.code === "KAKAO_TOKEN_INVALID") {
+      return "카카오 로그인이 만료되었습니다. 다시 시도해주세요.";
+    }
+    if (body?.code === "KAKAO_USER_INFO_FAILED") {
+      return "카카오 사용자 정보 조회에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해주세요.";
+    }
+  }
+
+  return body?.message ?? "카카오 로그인에 실패했습니다.";
+}
+
+export async function loginWithKakaoToken(
+  accessToken: string
 ): Promise<KakaoLoginResponse> {
   const url = new URL(KAKAO_LOGIN_PATH, API_BASE_URL).toString();
 
   if (__DEV__) {
     console.log("[kakao] login fetch request", {
       url,
+      accessTokenLength: accessToken.length,
     });
   }
 
   let response: Response;
   try {
     response = await fetch(url, {
-      body: JSON.stringify({ code } satisfies KakaoLoginRequest),
+      body: JSON.stringify({ accessToken } satisfies KakaoLoginRequest),
       headers: {
         "Content-Type": "application/json",
       },
@@ -58,7 +75,7 @@ export async function loginWithKakaoCode(
 
   if (!response.ok) {
     const errorBody = body as ServerErrorBody | null;
-    throw new ApiError(errorBody?.message ?? "카카오 로그인에 실패했습니다.", {
+    throw new ApiError(resolveErrorMessage(response.status, errorBody), {
       code: errorBody?.code,
       details: errorBody,
       status: response.status,

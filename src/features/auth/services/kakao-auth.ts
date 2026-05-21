@@ -1,9 +1,91 @@
 import { KAKAO_REDIRECT_URI, KAKAO_REST_API_KEY } from "@/src/shared/constants/env";
 
-import { loginWithKakaoCode } from "../api";
+import { loginWithKakaoToken } from "../api";
 import { saveSession } from "./session";
 
 const KAKAO_AUTHORIZE_URL = "https://kauth.kakao.com/oauth/authorize";
+const KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token";
+
+type KakaoTokenResponse = {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token?: string;
+  refresh_token_expires_in?: number;
+  scope?: string;
+};
+
+type KakaoTokenErrorResponse = {
+  error?: string;
+  error_description?: string;
+  error_code?: string;
+};
+
+async function exchangeKakaoCodeForToken(code: string): Promise<string> {
+  if (!KAKAO_REST_API_KEY || !KAKAO_REDIRECT_URI) {
+    throw new Error("카카오 로그인 환경변수가 설정되지 않았습니다.");
+  }
+
+  const body = new URLSearchParams({
+    client_id: KAKAO_REST_API_KEY,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: KAKAO_REDIRECT_URI,
+  });
+
+  if (__DEV__) {
+    console.log("[kakao] token exchange request", {
+      redirectUri: KAKAO_REDIRECT_URI,
+      codeLength: code.length,
+    });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(KAKAO_TOKEN_URL, {
+      body: body.toString(),
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+      },
+      method: "POST",
+    });
+  } catch (error) {
+    if (__DEV__) {
+      console.log("[kakao] token exchange network error", {
+        message:
+          error instanceof Error ? error.message : "unknown network error",
+      });
+    }
+    throw new Error(
+      "카카오 서버에 연결할 수 없습니다. 네트워크 상태를 확인하고 다시 시도해주세요."
+    );
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    | KakaoTokenResponse
+    | KakaoTokenErrorResponse
+    | null;
+
+  if (__DEV__) {
+    console.log("[kakao] token exchange response", {
+      status: response.status,
+      hasAccessToken: Boolean(
+        payload && "access_token" in payload && payload.access_token
+      ),
+    });
+  }
+
+  if (!response.ok || !payload || !("access_token" in payload)) {
+    const errorBody = payload as KakaoTokenErrorResponse | null;
+    throw new Error(
+      errorBody?.error_description ??
+        errorBody?.error ??
+        "카카오 액세스 토큰 발급에 실패했습니다."
+    );
+  }
+
+  return payload.access_token;
+}
 
 export function buildKakaoAuthorizeUrl() {
   if (!KAKAO_REST_API_KEY || !KAKAO_REDIRECT_URI) {
@@ -85,12 +167,20 @@ export async function completeKakaoLogin(code: string) {
   }
 
   if (__DEV__) {
-    console.log("[kakao] login api start", {
+    console.log("[kakao] login flow start", {
       codeLength: code.length,
     });
   }
 
-  const session = await loginWithKakaoCode(code);
+  const kakaoAccessToken = await exchangeKakaoCodeForToken(code);
+
+  if (__DEV__) {
+    console.log("[kakao] login api start", {
+      accessTokenLength: kakaoAccessToken.length,
+    });
+  }
+
+  const session = await loginWithKakaoToken(kakaoAccessToken);
   await saveSession(session);
 
   if (__DEV__) {

@@ -1,5 +1,5 @@
 export type KakaoLoginRequest = {
-  code: string;
+  accessToken: string;
 };
 
 export type AppleLoginRequest = {
