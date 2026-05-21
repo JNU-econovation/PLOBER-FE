@@ -110,7 +110,10 @@ export default ({ config }) => ({
       "expo-build-properties",
       {
         android: {
-          extraMavenRepos: ["https://repository.map.naver.com/archive/maven"]
+          extraMavenRepos: [
+            "https://repository.map.naver.com/archive/maven",
+            "https://devrepo.kakao.com/nexus/content/groups/public/"
+          ]
         }
       }
     ],
