@@ -15,15 +15,20 @@ import { colors, shadows } from "@/src/shared/theme";
 
 import { useAuthSession } from "../hooks/use-auth-session";
 import { isAppleLoginCanceled } from "../services/apple-auth";
-import { buildKakaoAuthorizeUrl } from "../services/kakao-auth";
+import { isKakaoLoginCanceled } from "../services/kakao-auth";
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { completeAppleLoginWithCredential } = useAuthSession();
+  const { completeAppleLoginWithCredential, completeKakaoLoginWithSdk } =
+    useAuthSession();
   const [appleLoginAvailable, setAppleLoginAvailable] = useState(false);
   const [appleLoginSubmitting, setAppleLoginSubmitting] = useState(false);
   const [appleLoginErrorMessage, setAppleLoginErrorMessage] = useState<
+    string | null
+  >(null);
+  const [kakaoLoginSubmitting, setKakaoLoginSubmitting] = useState(false);
+  const [kakaoLoginErrorMessage, setKakaoLoginErrorMessage] = useState<
     string | null
   >(null);
 
@@ -65,13 +70,40 @@ export function LoginScreen() {
     };
   }, []);
 
-  const handleLogin = () => {
-    if (Platform.OS === "web") {
-      window.location.href = buildKakaoAuthorizeUrl();
-      return;
-    }
+  const handleLogin = async () => {
+    if (kakaoLoginSubmitting) return;
 
-    router.push("/kakao-login");
+    setKakaoLoginSubmitting(true);
+    setKakaoLoginErrorMessage(null);
+
+    try {
+      await completeKakaoLoginWithSdk();
+      if (__DEV__) {
+        console.log("[kakao-login-screen] login completed");
+      }
+    } catch (error) {
+      if (isKakaoLoginCanceled(error)) {
+        if (__DEV__) {
+          console.log("[kakao-login-screen] login canceled by user");
+        }
+        return;
+      }
+
+      if (__DEV__) {
+        console.log("[kakao-login-screen] login failed", {
+          message: error instanceof Error ? error.message : "unknown error",
+          name: error instanceof Error ? error.name : "unknown",
+        });
+      }
+
+      setKakaoLoginErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "카카오 로그인에 실패했습니다. 잠시 후 다시 시도해주세요."
+      );
+    } finally {
+      setKakaoLoginSubmitting(false);
+    }
   };
 
   const handleAppleLogin = async () => {
@@ -167,10 +199,12 @@ export function LoginScreen() {
           <Pressable
             accessibilityLabel="카카오로 로그인"
             accessibilityRole="button"
+            disabled={kakaoLoginSubmitting}
             onPress={handleLogin}
             style={({ pressed }) => [
               styles.kakaoButton,
               pressed ? styles.pressed : null,
+              kakaoLoginSubmitting ? styles.disabled : null,
             ]}
           >
             <Text selectable style={styles.kakaoButtonText}>
@@ -181,6 +215,11 @@ export function LoginScreen() {
           {appleLoginErrorMessage ? (
             <Text selectable style={styles.errorMessage}>
               {appleLoginErrorMessage}
+            </Text>
+          ) : null}
+          {kakaoLoginErrorMessage ? (
+            <Text selectable style={styles.errorMessage}>
+              {kakaoLoginErrorMessage}
             </Text>
           ) : null}
           <LegalFooter

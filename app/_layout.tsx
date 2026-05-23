@@ -27,9 +27,6 @@ function RootStack() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
-      <Stack.Screen name="kakao-login" />
-      <Stack.Screen name="kakao-redirect" />
-      <Stack.Screen name="kakao/callback" />
       <Stack.Screen name="privacy" />
       <Stack.Screen name="support" />
       <Stack.Screen name="(tabs)" />
@@ -45,11 +42,7 @@ function RootStack() {
 function AuthGate({ children }: { children: ReactNode }) {
   const segments = useSegments();
   const { status } = useAuthSession();
-  const onAuthRoute =
-    segments[0] === "login" ||
-    segments[0] === "kakao-login" ||
-    segments[0] === "kakao-redirect" ||
-    segments[0] === "kakao";
+  const onAuthRoute = segments[0] === "login";
   const onPublicRoute = segments[0] === "privacy" || segments[0] === "support";
 
   if (status === "loading") {

@@ -110,7 +110,10 @@ export default ({ config }) => ({
       "expo-build-properties",
       {
         android: {
-          extraMavenRepos: ["https://repository.map.naver.com/archive/maven"]
+          extraMavenRepos: [
+            "https://repository.map.naver.com/archive/maven",
+            "https://devrepo.kakao.com/nexus/content/groups/public/"
+          ]
         }
       }
     ],
@@ -118,6 +121,18 @@ export default ({ config }) => ({
       "@mj-studio/react-native-naver-map",
       {
         client_id: process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID,
+      },
+    ],
+    [
+      "@react-native-kakao/core",
+      {
+        nativeAppKey: process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY,
+        android: {
+          authCodeHandlerActivity: true,
+        },
+        ios: {
+          handleKakaoOpenUrl: true,
+        },
       },
     ],
   ],

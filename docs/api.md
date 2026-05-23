@@ -41,9 +41,9 @@ type PresignedUploadUrlResponse = {
 
 ## Auth
 
-### POST `/api/v2/kakao/login`
+### POST `/api/auth/v2/kakao/login`
 
-카카오 액세스 토큰으로 로그인합니다. (현행)
+카카오 Native SDK에서 발급받은 accessToken으로 로그인합니다. (현행)
 
 - Query/Path parameters: 없음
 - Request body: `application/json`
@@ -62,11 +62,11 @@ type KakaoLoginRequest = {
 | accessToken 만료/위조 | 401 | `KAKAO_TOKEN_INVALID` | 카카오 액세스 토큰이 유효하지 않거나 만료되었습니다. |
 | 카카오 사용자 정보 조회 실패 | 401 | `KAKAO_USER_INFO_FAILED` | 카카오 사용자 정보 조회에 실패했습니다. |
 
-- 프론트 연동 메모: 카카오 SDK 또는 OAuth 토큰 교환으로 받은 `accessToken`을 전달합니다. `KAKAO_TOKEN_INVALID` 응답 시 토큰을 재발급하여 재시도하고, `KAKAO_USER_INFO_FAILED`는 네트워크 재시도로 안내합니다.
+- 프론트 연동 메모: 카카오 Native SDK (`@react-native-kakao/user`)의 `login()` 호출로 받은 `accessToken`을 전달합니다. `KAKAO_TOKEN_INVALID` 응답 시 토큰을 재발급하여 재시도하고, `KAKAO_USER_INFO_FAILED`는 네트워크 재시도로 안내합니다.
 
 ### POST `/api/auth/kakao/login` (Deprecated)
 
-카카오 OAuth 인가 코드로 로그인합니다. 구버전 클라이언트 호환용으로만 유지되며, 신규 구현은 `/api/v2/kakao/login`을 사용합니다.
+카카오 OAuth 인가 코드로 로그인합니다. WebView 기반 구버전 클라이언트 호환용으로만 유지되며, 신규 구현은 `/api/auth/v2/kakao/login`을 사용합니다.
 
 - Query/Path parameters: 없음
 - Request body: `application/json`
@@ -78,7 +78,7 @@ type CallbackRequest = {
 ```
 
 - Response body: `LoginResponse`
-- 프론트 연동 메모: 모든 클라이언트가 v2로 전환되면 백엔드에서 제거 예정입니다.
+- 프론트 연동 메모: 모든 클라이언트가 Native SDK 기반 `/api/auth/v2/kakao/login`으로 전환되면 백엔드에서 제거 예정입니다. 신규 코드에서는 사용하지 마세요.
 
 ### POST `/api/auth/apple/login`
 

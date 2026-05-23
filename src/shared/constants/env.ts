@@ -1,8 +1,6 @@
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
-export const KAKAO_REST_API_KEY =
-  process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ?? "";
-export const KAKAO_REDIRECT_URI =
-  process.env.EXPO_PUBLIC_KAKAO_REDIRECT_URI ?? "";
+export const KAKAO_NATIVE_APP_KEY =
+  process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ?? "";
 
 if (__DEV__ && !API_BASE_URL) {
   console.warn(
@@ -10,8 +8,8 @@ if (__DEV__ && !API_BASE_URL) {
   );
 }
 
-if (__DEV__ && (!KAKAO_REST_API_KEY || !KAKAO_REDIRECT_URI)) {
+if (__DEV__ && !KAKAO_NATIVE_APP_KEY) {
   console.warn(
-    "[env] Kakao OAuth env is missing. Set EXPO_PUBLIC_KAKAO_REST_API_KEY and EXPO_PUBLIC_KAKAO_REDIRECT_URI."
+    "[env] Kakao Native App Key is missing. Set EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY."
   );
 }

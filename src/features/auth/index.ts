@@ -1,7 +1,5 @@
 export { loginWithAppleToken, loginWithKakaoToken, logout } from "./api";
 export { AuthSessionProvider, useAuthSession } from "./hooks/use-auth-session";
-export { KakaoLoginRedirectScreen } from "./screens/kakao-login-redirect-screen";
-export { KakaoLoginWebviewScreen } from "./screens/kakao-login-webview-screen";
 export { LoginScreen } from "./screens/login-screen";
 export {
   clearSession,
@@ -13,10 +11,9 @@ export {
   isAppleLoginCanceled,
 } from "./services/apple-auth";
 export {
-  buildKakaoAuthorizeUrl,
-  completeKakaoLogin,
-  getKakaoRedirectResult,
-  isKakaoRedirectUrl,
+  isKakaoLoginCanceled,
+  signInWithKakao,
+  signOutFromKakao,
 } from "./services/kakao-auth";
 export type {
   AppleLoginRequest,
