@@ -1,13 +1,31 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, AppState, Linking, Platform } from "react-native";
 import * as Location from "expo-location";
 import { Pedometer } from "expo-sensors";
 
 import { usePloggingSession } from "./use-plogging-session";
+import {
+  pausePloggingBackgroundLocation,
+  startPloggingBackgroundLocation,
+  stopPloggingBackgroundLocation,
+} from "../services/plogging-background-location";
+import {
+  readBackgroundPloggingSnapshot,
+  setBackgroundPloggingStepCount,
+  subscribeBackgroundPloggingSnapshot,
+  type BackgroundPloggingSnapshot,
+} from "../services/plogging-background-store";
 
 type PermissionStatus = "idle" | "granted" | "denied" | "unavailable";
+type BackgroundTrackingStatus =
+  | "idle"
+  | "running"
+  | "foreground-only"
+  | "unavailable";
 
 export type PloggingTrackerState = {
+  backgroundLocationPermission: PermissionStatus;
+  backgroundTracking: BackgroundTrackingStatus;
   locationPermission: PermissionStatus;
   pedometerPermission: PermissionStatus;
   pedometerAvailable: boolean;
@@ -15,6 +33,7 @@ export type PloggingTrackerState = {
 
 type UsePloggingTrackerOptions = {
   isPaused: boolean;
+  startedAtMs: number;
 };
 
 // 노이즈가 큰 좌표는 누적 거리를 부풀리므로 정확도가 30m보다 나쁜 좌표는 버린다.
@@ -22,58 +41,112 @@ const ACCURACY_THRESHOLD_METERS = 30;
 
 export function usePloggingTracker({
   isPaused,
+  startedAtMs,
 }: UsePloggingTrackerOptions): PloggingTrackerState {
-  const { addSteps, appendRoutePoint, setPlaceName } = usePloggingSession();
+  const { addSteps, appendRoutePoint, appendRoutePoints, setPlaceName, stepCount } =
+    usePloggingSession();
 
   const [locationPermission, setLocationPermission] =
     useState<PermissionStatus>("idle");
+  const [backgroundLocationPermission, setBackgroundLocationPermission] =
+    useState<PermissionStatus>("idle");
+  const [backgroundTracking, setBackgroundTracking] =
+    useState<BackgroundTrackingStatus>("idle");
   const [pedometerPermission, setPedometerPermission] =
     useState<PermissionStatus>("idle");
   const [pedometerAvailable, setPedometerAvailable] = useState(false);
 
   const isPausedRef = useRef(isPaused);
+  const appBackgroundedAtRef = useRef<number | null>(null);
+  const appliedBackgroundRouteCountRef = useRef(0);
   const lastPedometerStepsRef = useRef<number | null>(null);
   const placeNameSetRef = useRef(false);
+  const skipNextPedometerBaselineRef = useRef(false);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
-  // 위치 권한 + 구독
+  const applyBackgroundSnapshot = useCallback(
+    (snapshot: BackgroundPloggingSnapshot) => {
+      if (snapshot.routePoints.length < appliedBackgroundRouteCountRef.current) {
+        appliedBackgroundRouteCountRef.current = 0;
+      }
+
+      const newPoints = snapshot.routePoints
+        .slice(appliedBackgroundRouteCountRef.current)
+        .map((point) => ({
+          latitude: point.latitude,
+          longitude: point.longitude,
+        }));
+
+      if (newPoints.length > 0) {
+        appendRoutePoints(newPoints);
+        appliedBackgroundRouteCountRef.current = snapshot.routePoints.length;
+
+        if (!placeNameSetRef.current) {
+          placeNameSetRef.current = true;
+          resolvePlaceName(newPoints[0]).then((name) => {
+            if (name) setPlaceName(name);
+          });
+        }
+      }
+    },
+    [appendRoutePoints, setPlaceName]
+  );
+
+  useEffect(() => {
+    return subscribeBackgroundPloggingSnapshot(applyBackgroundSnapshot);
+  }, [applyBackgroundSnapshot]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      readBackgroundPloggingSnapshot()
+        .then(applyBackgroundSnapshot)
+        .catch(() => undefined);
+    }, 2_000);
+
+    return () => clearInterval(intervalId);
+  }, [applyBackgroundSnapshot]);
+
+  // 백그라운드 GPS 태스크를 우선 사용하고, 현재 실행 환경에서 불가능하면 기존 foreground watch로 폴백한다.
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
     let cancelled = false;
 
     (async () => {
       try {
-        const current = await Location.getForegroundPermissionsAsync();
-        let status = current.status;
-        let canAskAgain = current.canAskAgain;
-
-        if (status !== "granted" && canAskAgain) {
-          const requested = await Location.requestForegroundPermissionsAsync();
-          status = requested.status;
-          canAskAgain = requested.canAskAgain;
-        }
-
+        const backgroundResult = await startPloggingBackgroundLocation({
+          startedAtMs,
+        });
         if (cancelled) return;
 
-        if (status !== "granted") {
-          setLocationPermission("denied");
-          if (!canAskAgain) {
-            showSettingsAlert(
-              "위치 권한이 필요합니다",
-              "플로깅 경로를 기록하려면 설정에서 위치 권한을 허용해주세요."
-            );
-          }
+        if (backgroundResult.status === "started") {
+          setLocationPermission("granted");
+          setBackgroundLocationPermission("granted");
+          setBackgroundTracking("running");
+
+          const snapshot = await readBackgroundPloggingSnapshot();
+          if (!cancelled) applyBackgroundSnapshot(snapshot);
           return;
         }
 
-        setLocationPermission("granted");
+        if (backgroundResult.status === "denied") {
+          setLocationPermission("denied");
+          setBackgroundLocationPermission("denied");
+          setBackgroundTracking("unavailable");
+          return;
+        }
 
         if (__DEV__) {
-          console.log("[plogging-tracker] starting location watch");
+          console.log("[plogging-tracker] foreground fallback", {
+            message: backgroundResult.message,
+          });
         }
+
+        setLocationPermission("granted");
+        setBackgroundLocationPermission("denied");
+        setBackgroundTracking("foreground-only");
 
         subscription = await Location.watchPositionAsync(
           {
@@ -110,15 +183,28 @@ export function usePloggingTracker({
               error instanceof Error ? error.message : "unknown location error",
           });
         }
-        if (!cancelled) setLocationPermission("denied");
+        if (!cancelled) {
+          setBackgroundTracking("unavailable");
+          setBackgroundLocationPermission("unavailable");
+          setLocationPermission("denied");
+        }
       }
     })();
 
     return () => {
       cancelled = true;
       subscription?.remove();
+      void stopPloggingBackgroundLocation();
     };
-  }, [appendRoutePoint, setPlaceName]);
+  }, [appendRoutePoint, applyBackgroundSnapshot, setPlaceName, startedAtMs]);
+
+  useEffect(() => {
+    void pausePloggingBackgroundLocation(isPaused);
+  }, [isPaused]);
+
+  useEffect(() => {
+    void setBackgroundPloggingStepCount(stepCount);
+  }, [stepCount]);
 
   // 만보기 가용성 + 권한 + 구독
   useEffect(() => {
@@ -173,6 +259,11 @@ export function usePloggingTracker({
           lastPedometerStepsRef.current = observedSteps;
 
           if (previousSteps === null) {
+            if (skipNextPedometerBaselineRef.current) {
+              skipNextPedometerBaselineRef.current = false;
+              return;
+            }
+
             if (!isPausedRef.current && observedSteps > 0) {
               addSteps(observedSteps);
             }
@@ -209,11 +300,75 @@ export function usePloggingTracker({
     };
   }, [addSteps]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "background" || nextState === "inactive") {
+        appBackgroundedAtRef.current = Date.now();
+        return;
+      }
+
+      if (nextState !== "active") return;
+
+      readBackgroundPloggingSnapshot()
+        .then(applyBackgroundSnapshot)
+        .catch(() => undefined);
+
+      const backgroundedAt = appBackgroundedAtRef.current;
+      appBackgroundedAtRef.current = null;
+
+      if (
+        backgroundedAt === null ||
+        isPausedRef.current ||
+        Platform.OS !== "ios"
+      ) {
+        return;
+      }
+
+      syncPedometerSteps(backgroundedAt, Date.now(), addSteps).then((synced) => {
+        if (synced) {
+          lastPedometerStepsRef.current = null;
+          skipNextPedometerBaselineRef.current = true;
+        }
+      });
+    });
+
+    return () => subscription.remove();
+  }, [addSteps, applyBackgroundSnapshot]);
+
   return {
+    backgroundLocationPermission,
+    backgroundTracking,
     locationPermission,
     pedometerAvailable,
     pedometerPermission,
   };
+}
+
+async function syncPedometerSteps(
+  fromMs: number,
+  toMs: number,
+  addSteps: (delta: number) => void
+): Promise<boolean> {
+  if (toMs <= fromMs) return false;
+
+  try {
+    const result = await Pedometer.getStepCountAsync(
+      new Date(fromMs),
+      new Date(toMs)
+    );
+    const steps = toWholeStepCount(result.steps);
+    if (steps === null || steps <= 0) return false;
+    addSteps(steps);
+    return true;
+  } catch (error) {
+    if (__DEV__) {
+      console.log("[plogging-pedometer] background sync skipped", {
+        message:
+          error instanceof Error ? error.message : "unknown pedometer error",
+      });
+    }
+    return false;
+  }
 }
 
 async function resolvePlaceName(point: {

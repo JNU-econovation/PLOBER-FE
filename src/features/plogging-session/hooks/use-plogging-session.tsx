@@ -44,6 +44,7 @@ type PloggingSessionContextValue = {
   setMapImageUri: (uri: string | null) => void;
   setMapImageObjectUrl: (url: string | null) => void;
   resetSession: (options?: { preserveRecommendedRoute?: boolean }) => void;
+  appendRoutePoints: (points: RoutePoint[]) => void;
 };
 
 const PloggingSessionContext =
@@ -95,23 +96,48 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // 좌표 한 개 추가 시 거리/시작-종료 좌표를 함께 갱신.
+  // 좌표 추가 시 거리/시작-종료 좌표를 함께 갱신.
   // 거리 계산은 이전 마지막 좌표와의 haversine으로 누적한다.
-  const appendRoutePoint = useCallback((point: RoutePoint) => {
+  const appendRoutePoints = useCallback((points: RoutePoint[]) => {
+    if (points.length === 0) return;
+
     setRoutePoints((prev) => {
-      const previous = prev[prev.length - 1];
-      if (previous) {
-        const delta = haversineMeters(previous, point);
-        if (delta > 0) {
-          setDistanceMeters((dist) => dist + delta);
+      let previous = prev[prev.length - 1];
+      let distanceDelta = 0;
+      const next = [...prev];
+
+      for (const point of points) {
+        if (!previous) {
+          setStartCoord(point);
+        } else {
+          const delta = haversineMeters(previous, point);
+          if (delta > 0) {
+            distanceDelta += delta;
+          }
         }
-      } else {
-        setStartCoord(point);
+        previous = point;
+        next.push(point);
       }
-      setEndCoord(point);
-      return [...prev, point];
+
+      if (distanceDelta > 0) {
+        setDistanceMeters((dist) => dist + distanceDelta);
+      }
+
+      const lastPoint = next[next.length - 1];
+      if (lastPoint) {
+        setEndCoord(lastPoint);
+      }
+
+      return next;
     });
   }, []);
+
+  const appendRoutePoint = useCallback(
+    (point: RoutePoint) => {
+      appendRoutePoints([point]);
+    },
+    [appendRoutePoints]
+  );
 
   const addSteps = useCallback((delta: number) => {
     if (delta <= 0) return;
@@ -178,6 +204,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       addPhotoObjectUrl,
       addSteps,
       appendRoutePoint,
+      appendRoutePoints,
       caloriesBurned: caloriesFromSteps(stepCount),
       distanceMeters,
       endCoord,
@@ -209,6 +236,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       addPhotoObjectUrl,
       addSteps,
       appendRoutePoint,
+      appendRoutePoints,
       distanceMeters,
       endCoord,
       finishedAtMs,

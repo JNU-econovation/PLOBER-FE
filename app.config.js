@@ -7,7 +7,7 @@ export default ({ config }) => ({
   slug: "NaverMapPloggingApp",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/icons/appIcon.png",
+  icon: "./assets/icons/appIcon-native.png",
   scheme: "navermapploggingapp",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -21,10 +21,14 @@ export default ({ config }) => ({
       CFBundleAllowMixedLocalizations: true,
       CFBundleDisplayName: "플로버",
       ITSAppUsesNonExemptEncryption: false,
+      NSLocationAlwaysAndWhenInUseUsageDescription: "화면을 끄거나 다른 앱을 사용해도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
+      NSLocationAlwaysUsageDescription: "화면을 끄거나 다른 앱을 사용해도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
       NSMotionUsageDescription: "플로깅 중 걸음 수를 측정하기 위해 동작 인식 권한이 필요합니다.",
       NSPhotoLibraryUsageDescription: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
       NSCameraUsageDescription: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
+      NSSupportsLiveActivities: true,
+      UIBackgroundModes: ["location"],
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,
         NSExceptionDomains: {
@@ -51,7 +55,7 @@ export default ({ config }) => ({
   android: {
     adaptiveIcon: {
       backgroundColor: "#FFFFFF",
-      foregroundImage: "./assets/icons/appIcon.png",
+      foregroundImage: "./assets/icons/appIcon-native.png",
     },
     edgeToEdgeEnabled: true,
     usesCleartextTraffic: true,
@@ -61,6 +65,10 @@ export default ({ config }) => ({
     permissions: [
       "ACCESS_COARSE_LOCATION",
       "ACCESS_FINE_LOCATION",
+      "ACCESS_BACKGROUND_LOCATION",
+      "FOREGROUND_SERVICE",
+      "FOREGROUND_SERVICE_LOCATION",
+      "POST_NOTIFICATIONS",
       "ACTIVITY_RECOGNITION",
       "CAMERA",
       "READ_EXTERNAL_STORAGE",
@@ -70,7 +78,7 @@ export default ({ config }) => ({
   
   web: {
     output: "static",
-    favicon: "./assets/icons/appIcon.png",
+    favicon: "./assets/icons/appIcon.svg",
   },
   
   plugins: [
@@ -82,8 +90,11 @@ export default ({ config }) => ({
       "expo-location",
       {
         locationWhenInUsePermission: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
-        isAndroidBackgroundLocationEnabled: false,
-        isAndroidForegroundServiceEnabled: false,
+        locationAlwaysAndWhenInUsePermission: "화면을 끄거나 다른 앱을 사용해도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
+        isIosBackgroundLocationEnabled: true,
+        isAndroidBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
+        androidForegroundServiceIcon: "./assets/images/android-icon-monochrome.png",
       },
     ],
     [

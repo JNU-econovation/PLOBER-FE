@@ -1,15 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   StyleSheet,
   Text,
   View,
+  type ImageStyle,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 
 import { colors, shadows, typography } from "../theme";
+
+const cameraIconSource = require("@/assets/icons/camera-report.svg");
 
 export function StatNumber({
   value,
@@ -121,10 +125,11 @@ export function MiniGlyph({
 export function CameraGlyph({ light: _light = false }: { light?: boolean }) {
   return (
     <View style={styles.cameraGlyph}>
-      <MaterialCommunityIcons
-        color={colors.icon}
-        name="camera"
-        size={34}
+      <Image
+        contentFit="contain"
+        source={cameraIconSource}
+        style={styles.cameraIcon}
+        tintColor="#33363F"
       />
     </View>
   );
@@ -148,12 +153,12 @@ export function RoutePin({ large = false }: { large?: boolean }) {
   );
 }
 
-export function PauseGlyph() {
-  return <MaterialCommunityIcons color={colors.icon} name="pause" size={18} />;
+export function PauseGlyph({ color = colors.icon }: { color?: string }) {
+  return <MaterialCommunityIcons color={color} name="pause" size={18} />;
 }
 
-export function PlayGlyph() {
-  return <MaterialCommunityIcons color={colors.icon} name="play" size={18} />;
+export function PlayGlyph({ color = colors.icon }: { color?: string }) {
+  return <MaterialCommunityIcons color={color} name="play" size={18} />;
 }
 
 const styles = StyleSheet.create<{
@@ -171,6 +176,7 @@ const styles = StyleSheet.create<{
   miniGlyphWrap: ViewStyle;
   miniGlyph: ViewStyle;
   cameraGlyph: ViewStyle;
+  cameraIcon: ImageStyle;
   levelBadge: ViewStyle;
   levelBadgeText: TextStyle;
   routePin: ViewStyle;
@@ -278,6 +284,10 @@ const styles = StyleSheet.create<{
     justifyContent: "center",
     width: 52,
     ...shadows.soft,
+  },
+  cameraIcon: {
+    height: 34,
+    width: 34,
   },
   levelBadge: {
     alignItems: "center",

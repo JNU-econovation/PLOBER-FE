@@ -6,7 +6,7 @@ import {
   useState,
   type ComponentProps,
 } from "react";
-import { StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   NaverMapMarkerOverlay,
@@ -21,7 +21,11 @@ import { useDeviceLocation } from "../../location";
 import { colors } from "../../theme";
 import { CAMPUS_CAMERA, ROUTE_COORDS } from "../data/map-data";
 import { useHotspotPolygons } from "../hooks/use-hotspot-polygons";
-import { getHotspotBlobColor } from "../services/hotspot-tiles";
+import {
+  getHotspotFillColor,
+  getHotspotOutlineColor,
+  getHotspotOutlineWidth,
+} from "../services/hotspot-tiles";
 import {
   buildRouteGuideMarkers,
   type RouteGuideMarkers,
@@ -29,6 +33,11 @@ import {
 import { HeatmapLegend } from "./heatmap-legend";
 import type { PloggingMapProps } from "./types";
 
+const FALLBACK_CAMERA = {
+  latitude: 36.5,
+  longitude: 127.8,
+  zoom: 7,
+};
 // 이 이상 좌표가 변할 때만 카메라를 다시 애니메이션한다(약 22m).
 // GPS 지터로 카메라가 계속 흔들리지 않게 막는 임계값.
 const CAMERA_ANIMATE_THRESHOLD = 0.0002;
@@ -59,12 +68,12 @@ export function PloggingMap({
   toilets,
 }: PloggingMapProps) {
   const mapRef = useRef<NaverMapViewRef>(null);
-  const { position } = useDeviceLocation();
+  const { permission, position } = useDeviceLocation();
   const positionLatitude = position?.latitude;
   const positionLongitude = position?.longitude;
   const initialZoom = zoom ?? CAMPUS_CAMERA.zoom;
   const [cameraZoom, setCameraZoom] = useState(initialZoom);
-  const hotspots = useHotspotPolygons(heatmapVisible);
+  const hotspots = useHotspotPolygons(heatmapVisible, cameraZoom);
   const visibleRoutePoints =
     routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
   const routeGuides = useMemo(
@@ -73,9 +82,18 @@ export function PloggingMap({
   );
   const facilityMarkerAlpha = getFacilityMarkerAlpha(cameraZoom);
 
-  // 최초 카메라는 mount 시점 공유 위치(없으면 CAMPUS_CAMERA fallback).
+  // 최초 카메라는 실제 위치를 우선하고, 위치 권한이 막힌 경우에만 전국 fallback을 쓴다.
   // 이후 위치 변경은 animateCameraTo로 부드럽게 이동시킨다.
   const initialPositionRef = useRef(position);
+  if (!initialPositionRef.current && position) {
+    initialPositionRef.current = position;
+  }
+  const initialPosition = initialPositionRef.current;
+  const waitingForInitialPosition =
+    followUserLocation &&
+    !initialPosition &&
+    permission !== "denied" &&
+    permission !== "unavailable";
   const lastAnimatedRef = useRef<{
     latitude: number;
     longitude: number;
@@ -87,11 +105,9 @@ export function PloggingMap({
   } | null>(null);
 
   const initialCamera = {
-    latitude:
-      initialPositionRef.current?.latitude ?? CAMPUS_CAMERA.latitude,
-    longitude:
-      initialPositionRef.current?.longitude ?? CAMPUS_CAMERA.longitude,
-    zoom: initialZoom,
+    latitude: initialPosition?.latitude ?? FALLBACK_CAMERA.latitude,
+    longitude: initialPosition?.longitude ?? FALLBACK_CAMERA.longitude,
+    zoom: initialPosition ? initialZoom : FALLBACK_CAMERA.zoom,
   };
 
   useEffect(() => {
@@ -160,100 +176,112 @@ export function PloggingMap({
 
   return (
     <View style={[styles.container, style]}>
-      <NaverMapView
-        ref={mapRef}
-        initialCamera={initialCamera}
-        isShowLocationButton={false}
-        isShowZoomControls={false}
-        locationOverlay={
-          followUserLocation
-            ? {
-                isVisible:
-                  typeof positionLatitude === "number" &&
-                  typeof positionLongitude === "number",
-                position:
-                  typeof positionLatitude === "number" &&
-                  typeof positionLongitude === "number"
-                  ? {
-                      latitude: positionLatitude,
-                      longitude: positionLongitude,
-                    }
-                  : undefined,
-                anchor: { x: 0.5, y: 0.5 },
-                subAnchor: { x: 0.5, y: 0.5 },
-              }
-            : undefined
-        }
-        onCameraChanged={handleCameraChanged}
-        onInitialized={handleInitialized}
-        style={StyleSheet.absoluteFill}
-      >
-        {heatmapVisible
-          ? hotspots.polygons.map((hotspot) => (
-              <NaverMapPolygonOverlay
-                key={hotspot.id}
-                color={getHotspotBlobColor(hotspot.trashScore)}
-                coords={hotspot.blobCoords}
-                outlineColor="rgba(255, 255, 255, 0)"
-                outlineWidth={0}
-                zIndex={1}
+      {waitingForInitialPosition ? (
+        <View style={styles.mapLoading}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
+        <NaverMapView
+          ref={mapRef}
+          initialCamera={initialCamera}
+          isShowLocationButton={false}
+          isShowZoomControls={false}
+          locationOverlay={
+            followUserLocation
+              ? {
+                  isVisible:
+                    typeof positionLatitude === "number" &&
+                    typeof positionLongitude === "number",
+                  position:
+                    typeof positionLatitude === "number" &&
+                    typeof positionLongitude === "number"
+                    ? {
+                        latitude: positionLatitude,
+                        longitude: positionLongitude,
+                      }
+                    : undefined,
+                  anchor: { x: 0.5, y: 0.5 },
+                  subAnchor: { x: 0.5, y: 0.5 },
+                }
+              : undefined
+          }
+          onCameraChanged={handleCameraChanged}
+          onInitialized={handleInitialized}
+          style={StyleSheet.absoluteFill}
+        >
+          {heatmapVisible
+            ? hotspots.polygons.map((hotspot) => (
+                <NaverMapPolygonOverlay
+                  key={hotspot.id}
+                  color={getHotspotFillColor(
+                    hotspot.trashScore,
+                    hotspot.lod,
+                    cameraZoom
+                  )}
+                  coords={
+                    hotspot.lod === "res11" ? hotspot.blobCoords : hotspot.coords
+                  }
+                  outlineColor={getHotspotOutlineColor(hotspot.lod, cameraZoom)}
+                  outlineWidth={getHotspotOutlineWidth(hotspot.lod)}
+                  zIndex={1}
+                />
+              ))
+            : null}
+          {routeVisible ? (
+            <>
+              <NaverMapPolylineOverlay
+                color={colors.primaryDark}
+                coords={visibleRoutePoints}
+                zIndex={2}
+                width={9}
               />
-            ))
-          : null}
-        {routeVisible ? (
-          <>
-            <NaverMapPolylineOverlay
-              color={colors.primaryDark}
-              coords={visibleRoutePoints}
-              zIndex={2}
-              width={9}
-            />
-            <RouteGuideOverlays guides={routeGuides} />
-          </>
-        ) : null}
-        {trashBins?.map((bin) => (
-          <NaverMapMarkerOverlay
-            alpha={facilityMarkerAlpha}
-            anchor={{ x: 0.5, y: 1 }}
-            height={FACILITY_MARKER_HEIGHT}
-            isHidden={facilityMarkerAlpha <= 0}
-            isHideCollidedMarkers
-            key={`trash-${bin.id}`}
-            latitude={bin.latitude}
-            longitude={bin.longitude}
-            minZoom={FACILITY_MARKER_HIDE_ZOOM}
-            width={FACILITY_MARKER_SIZE}
-            zIndex={6}
-          >
-            <FacilityMarker
-              color={bin.tintColor ?? "#6B7280"}
-              iconName="trash-can"
-              markerKey={`trash-${bin.id}-${bin.tintColor ?? "fallback"}`}
-            />
-          </NaverMapMarkerOverlay>
-        ))}
-        {toilets?.map((toilet) => (
-          <NaverMapMarkerOverlay
-            alpha={facilityMarkerAlpha}
-            anchor={{ x: 0.5, y: 1 }}
-            height={FACILITY_MARKER_HEIGHT}
-            isHidden={facilityMarkerAlpha <= 0}
-            isHideCollidedMarkers
-            key={`toilet-${toilet.id}`}
-            latitude={toilet.latitude}
-            longitude={toilet.longitude}
-            minZoom={FACILITY_MARKER_HIDE_ZOOM}
-            width={FACILITY_MARKER_SIZE}
-            zIndex={6}
-          >
-            <FacilityMarker
-              color={toilet.tintColor ?? "#8B5CF6"}
-              iconName="toilet"
-              markerKey={`toilet-${toilet.id}-${toilet.tintColor ?? "fallback"}`}
-            />
-          </NaverMapMarkerOverlay>
-        ))}
-      </NaverMapView>
+              <RouteGuideOverlays guides={routeGuides} />
+            </>
+          ) : null}
+          {trashBins?.map((bin) => (
+            <NaverMapMarkerOverlay
+              alpha={facilityMarkerAlpha}
+              anchor={{ x: 0.5, y: 1 }}
+              height={FACILITY_MARKER_HEIGHT}
+              isHidden={facilityMarkerAlpha <= 0}
+              isHideCollidedMarkers
+              key={`trash-${bin.id}`}
+              latitude={bin.latitude}
+              longitude={bin.longitude}
+              minZoom={FACILITY_MARKER_HIDE_ZOOM}
+              width={FACILITY_MARKER_SIZE}
+              zIndex={6}
+            >
+              <FacilityMarker
+                color={bin.tintColor ?? "#6B7280"}
+                iconName="trash-can"
+                markerKey={`trash-${bin.id}-${bin.tintColor ?? "fallback"}`}
+              />
+            </NaverMapMarkerOverlay>
+          ))}
+          {toilets?.map((toilet) => (
+            <NaverMapMarkerOverlay
+              alpha={facilityMarkerAlpha}
+              anchor={{ x: 0.5, y: 1 }}
+              height={FACILITY_MARKER_HEIGHT}
+              isHidden={facilityMarkerAlpha <= 0}
+              isHideCollidedMarkers
+              key={`toilet-${toilet.id}`}
+              latitude={toilet.latitude}
+              longitude={toilet.longitude}
+              minZoom={FACILITY_MARKER_HIDE_ZOOM}
+              width={FACILITY_MARKER_SIZE}
+              zIndex={6}
+            >
+              <FacilityMarker
+                color={toilet.tintColor ?? "#8B5CF6"}
+                iconName="toilet"
+                markerKey={`toilet-${toilet.id}-${toilet.tintColor ?? "fallback"}`}
+              />
+            </NaverMapMarkerOverlay>
+          ))}
+        </NaverMapView>
+      )}
       {dimmed ? (
         <View style={[styles.dimmed, heatmapVisible ? styles.dimmedHeatmap : null]} />
       ) : null}
@@ -333,6 +361,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     overflow: "hidden",
+  },
+  mapLoading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: colors.background,
+    justifyContent: "center",
   },
   dimmed: {
     ...StyleSheet.absoluteFillObject,

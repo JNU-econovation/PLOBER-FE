@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { useAuthSession } from "@/src/features/auth";
 import { useDeviceLocation } from "@/src/shared/location";
 
-import { getRecommendedRoute } from "../api";
+import { getRecommendedRoutes } from "../api";
 import type { RecommendedRoute } from "../api";
 
 type RecommendedRouteState =
   | { status: "idle" | "loading" }
-  | { status: "success"; route: RecommendedRoute }
+  | { status: "success"; routes: RecommendedRoute[] }
   | { status: "error"; message: string };
 
 type UseRecommendedRouteOptions = {
@@ -54,15 +54,22 @@ export function useRecommendedRoute({
     let mounted = true;
     setState({ status: "loading" });
 
-    getRecommendedRoute({
+    getRecommendedRoutes({
       lat: position.latitude,
       lon: position.longitude,
       mode: "PLOGGING",
       time: timeMinutes,
     })
-      .then((route) => {
+      .then((routes) => {
         if (!mounted) return;
-        setState({ status: "success", route });
+        if (routes.length === 0) {
+          setState({
+            message: "추천 경로가 없습니다. 다시 시도해주세요.",
+            status: "error",
+          });
+          return;
+        }
+        setState({ routes, status: "success" });
       })
       .catch((error) => {
         if (!mounted) return;

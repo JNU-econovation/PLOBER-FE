@@ -20,6 +20,7 @@ export type HotspotPolygon = {
   id: string;
   center: { latitude: number; longitude: number };
   coords: { latitude: number; longitude: number }[];
+  lod: "res7" | "res9" | "res11";
   trashScore: number;
 };
 

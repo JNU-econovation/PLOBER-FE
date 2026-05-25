@@ -27,13 +27,9 @@ export function usePloggingTimer() {
 
   const isPaused = pausedAt !== null;
 
-  // 진행 중일 때만 1초마다 now 갱신.
-  // 카운터를 1씩 증가시키지 않고 항상 Date.now()를 다시 읽기 때문에
-  // 백그라운드/저전력 등으로 인터벌이 누락돼도 표시 시간이 정확하다.
+  // 1초마다 now 갱신.
+  // elapsed는 일시정지 중 pausedAt 기준으로 고정되지만, 휴식 시간 표시는 계속 갱신한다.
   useEffect(() => {
-    if (isPaused) {
-      return;
-    }
     intervalRef.current = setInterval(() => {
       setNow(Date.now());
     }, 1000);
@@ -43,7 +39,7 @@ export function usePloggingTimer() {
         intervalRef.current = null;
       }
     };
-  }, [isPaused]);
+  }, []);
 
   // 백그라운드 → 포그라운드 복귀 시 즉시 now 보정
   useEffect(() => {
@@ -61,10 +57,14 @@ export function usePloggingTimer() {
   const elapsedMs = isPaused
     ? pausedAt - startedAt - pausedTotalMs
     : now - startedAt - pausedTotalMs;
+  const restMs =
+    pausedAt === null ? pausedTotalMs : pausedTotalMs + (now - pausedAt);
 
   const pause = () => {
     if (isPaused) return;
-    setPausedAt(Date.now());
+    const nextPausedAt = Date.now();
+    setPausedAt(nextPausedAt);
+    setNow(nextPausedAt);
   };
 
   const resume = () => {
@@ -91,7 +91,22 @@ export function usePloggingTimer() {
     isPaused,
     pause,
     resume,
+    restFormatted: formatCompactElapsed(restMs),
+    restMs: Math.max(0, restMs),
     toggle,
     startedAt,
   };
+}
+
+function formatCompactElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
 }

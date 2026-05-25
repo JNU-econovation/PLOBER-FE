@@ -425,8 +425,8 @@ type CompleteResponse = {
 | `mode` | `string` | No   | 경로 모드. 예: `PLOGGING`                        |
 
 - Request body: 없음
-- Response body: `RouteResponse`
-- 프론트 연동 메모: 응답의 `encodedPath`는 지도 경로 표시를 위해 polyline 디코딩이 필요합니다.
+- Response body: `RoutesResponse`
+- 프론트 연동 메모: 응답의 `routes` 배열에는 방향이 다각화된 왕복 추천 경로들이 들어옵니다. 각 항목의 `encodedPath`는 지도 경로 표시를 위해 polyline 디코딩이 필요하고, `ploggingScore`는 추천 카드의 점수 표시에 사용합니다.
 - URL 예시
 
 ```text
@@ -610,8 +610,13 @@ type RouteRequest = {
 
 type RouteResponse = {
   distanceMeter: number;
-  timeMillis: number;
   encodedPath: string;
+  ploggingScore: number;
+  timeMillis: number;
+};
+
+type RoutesResponse = {
+  routes: RouteResponse[];
 };
 ```
 
@@ -619,11 +624,15 @@ type RouteResponse = {
 
 이 내용은 Swagger에 포함되지 않은 외부 연동 메모입니다. 쓰레기 발생률 히트맵을 표시할 때 사용합니다.
 
-- 타일 URL: `http://54.180.111.192:3000/predicted_hotspots/{z}/{x}/{y}`
-- source layer ID: `predicted_hotspots`
+- 타일 URL: `http://54.180.111.192:3000/hotspots/{z}/{x}/{y}`
+- 지원 줌 레벨: `8.0`-`18.0`
+- source layer ID:
+  - `hotspots_res7`: Coarse Hexagon. Zoom `12.0`에서 opacity `0.45`, `12.8`에서 `0.0`
+  - `hotspots_res9`: Fine Hexagon. Zoom `12.0`에서 `0.0`, `12.8`-`16.5`에서 `0.60`, `17.2`에서 `0.0`
+  - `hotspots_res11`: Ultra-Fine H3. Zoom `16.5`에서 `0.0`, `17.2` 이후 `0.55`, 테두리 opacity/width `0`
 - 형식: MVT vector tile
 - CORS: 전체 허용
-- 주요 속성: `trash_score` (`0.0`-`1.0`), `nightlife_count_30m`, `cafe_count_30m`
+- 주요 속성: `h3_cell`, `trash_score_avg` (`0.0`-`1.0`), `trash_score_max`, `cell_count`
 - React Native 권장 라이브러리: `@maplibre/maplibre-react-native`
 
 ```bash
@@ -647,28 +656,36 @@ export function HotspotMap() {
 
       <MapLibreGL.VectorSource
         id="hotspots"
-        tileUrlTemplates={[`${TILE_SERVER_URL}/predicted_hotspots/{z}/{x}/{y}`]}
+        tileUrlTemplates={[`${TILE_SERVER_URL}/hotspots/{z}/{x}/{y}`]}
       >
         <MapLibreGL.FillLayer
-          id="hotspot-fill"
-          sourceLayerID="predicted_hotspots"
+          id="hotspots-res9-fill"
+          sourceLayerID="hotspots_res9"
           style={{
             fillColor: [
               "interpolate",
               ["linear"],
-              ["get", "trash_score"],
+              ["get", "trash_score_avg"],
               0.0,
-              "rgba(34, 197, 94, 0.05)",
-              0.3,
-              "rgba(234, 179, 8, 0.3)",
-              0.6,
-              "rgba(249, 115, 22, 0.5)",
-              0.8,
-              "rgba(239, 68, 68, 0.7)",
+              "#33ccff",
+              0.5,
+              "#ff9900",
               1.0,
-              "rgba(185, 28, 28, 0.9)",
+              "#ff3366",
             ],
-            fillOpacity: 0.7,
+            fillOpacity: [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12.0,
+              0.0,
+              12.8,
+              0.6,
+              16.5,
+              0.6,
+              17.2,
+              0.0,
+            ],
           }}
         />
       </MapLibreGL.VectorSource>

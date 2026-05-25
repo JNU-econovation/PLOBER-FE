@@ -132,8 +132,6 @@ function RecentRecordsSection() {
   );
 }
 
-// 🛠 fix(api-integrate): 상단 hero 카드 - 월간 누적 API 연동.
-// 백엔드 응답에 "수거한 쓰레기" 필드가 없어 해당 칸은 "-" placeholder를 표시한다.
 function MonthlySummaryHero({
   year,
   month,
@@ -153,16 +151,14 @@ function MonthlySummaryHero({
       <Text selectable style={styles.monthLabel}>
         {month}월달 누적
       </Text>
-      <MonthlySummaryHeroBody month={month} state={state} />
+      <MonthlySummaryHeroBody state={state} />
     </LinearGradient>
   );
 }
 
 function MonthlySummaryHeroBody({
-  month,
   state,
 }: {
-  month: number;
   state: ReturnType<typeof useMonthlyPloggingSummary>;
 }) {
   if (state.status === "loading" || state.status === "idle") {
@@ -194,6 +190,9 @@ function MonthlySummaryHeroData({
   // 칼로리는 kcal 단위가 클 수 있으니 시안의 "K"(천 단위) 표기를 유지.
   // ex) 20312 → "20.3"
   const caloriesInThousands = (summary.totalCaloriesBurned / 1000).toFixed(1);
+  const distanceKilometers = formatSummaryKilometers(
+    summary.totalDistanceMeters,
+  );
   const stepCountLabel = formatInteger(summary.totalStepCount);
   const ploggingCountLabel = formatInteger(summary.totalPloggingCount);
 
@@ -211,8 +210,11 @@ function MonthlySummaryHeroData({
       </Text>
       <View style={styles.heroLine} />
       <View style={styles.heroStats}>
-        {/* 🛠 백엔드 응답에 쓰레기 수거 누적이 아직 없어 placeholder 유지. */}
-        <SummaryMetric caption="수거한 쓰레기" unit="개" value="-" />
+        <SummaryMetric
+          caption="걸은 거리"
+          unit="km"
+          value={distanceKilometers}
+        />
         <SummaryMetric caption="칼로리" unit="K" value={caloriesInThousands} />
         <SummaryMetric caption="플로깅" unit="회" value={ploggingCountLabel} />
       </View>
@@ -363,6 +365,12 @@ function formatKilometers(meters: number): string {
 
 function formatInteger(value: number): string {
   return Math.round(value).toLocaleString("ko-KR");
+}
+
+function formatSummaryKilometers(meters: number): string {
+  return new Intl.NumberFormat("ko-KR", {
+    maximumFractionDigits: 1,
+  }).format(meters / 1000);
 }
 
 // "4월 21일 화 12:56 - 13:34" 형태로 만든다.

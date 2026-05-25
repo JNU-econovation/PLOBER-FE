@@ -1,7 +1,8 @@
-export { getRecommendedRoute } from "./get-recommended-route";
+export { getRecommendedRoutes } from "./get-recommended-route";
 export type {
   GetRecommendedRouteRequest,
-  GetRecommendedRouteResponse,
+  GetRecommendedRoutesResponse,
   RecommendedRoute,
+  RecommendedRouteResponse,
   RouteRecommendationMode,
 } from "./types";
