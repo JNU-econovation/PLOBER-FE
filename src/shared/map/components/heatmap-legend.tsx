@@ -7,10 +7,10 @@ export function HeatmapLegend({ top }: { top?: number }) {
   return (
     <View pointerEvents="none" style={[styles.legend, { top: top ?? 156 }]}>
       <Text selectable style={styles.title}>
-        쓰레기 발생률
+        오염지수
       </Text>
       <LinearGradient
-        colors={["#22C55E", "#FACC15", "#F97316", "#EF4444", "#B91C1C"]}
+        colors={["#33CCFF", "#FF9900", "#FF3366"]}
         end={{ x: 1, y: 0 }}
         start={{ x: 0, y: 0 }}
         style={styles.gradient}

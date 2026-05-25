@@ -1,21 +1,18 @@
 import * as AppleAuthentication from "expo-apple-authentication";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ScreenRoot } from "@/src/shared/ui";
 import { colors, shadows } from "@/src/shared/theme";
+import { ScreenRoot } from "@/src/shared/ui";
 
 import { useAuthSession } from "../hooks/use-auth-session";
 import { isAppleLoginCanceled } from "../services/apple-auth";
 import { isKakaoLoginCanceled } from "../services/kakao-auth";
+
+const appIconSource = require("@/assets/icons/appIcon.svg");
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -167,14 +164,17 @@ export function LoginScreen() {
         ]}
       >
         <View style={styles.brandBlock}>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoFace}>{">  ·"}</Text>
-          </View>
+          <Image
+            accessibilityLabel="PLOBER 앱 아이콘"
+            contentFit="contain"
+            source={appIconSource}
+            style={styles.logoMark}
+          />
           <Text selectable style={styles.title}>
-            PLOBER
+            PLOVER
           </Text>
           <Text selectable style={styles.subtitle}>
-            카카오 계정으로 로그인하고 플로깅 기록을 이어가세요.
+            로그인하고 플로깅을 시작해보세요!
           </Text>
         </View>
 
@@ -339,18 +339,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 0,
   },
-  logoFace: {
-    color: colors.icon,
-    fontSize: 28,
-    fontWeight: "800",
-    transform: [{ rotate: "7deg" }],
-  },
   logoMark: {
-    alignItems: "center",
-    backgroundColor: "#E9FFBE",
     borderRadius: 24,
     height: 108,
-    justifyContent: "center",
     marginBottom: 28,
     width: 108,
   },

@@ -3,14 +3,21 @@ import Pbf from "pbf";
 
 import type { HotspotPolygon } from "../components/types";
 
-const HOTSPOT_TILE_URL =
-  "http://54.180.111.192:3000/predicted_hotspots/{z}/{x}/{y}";
-const HOTSPOT_SOURCE_LAYER = "predicted_hotspots";
-const HOTSPOT_ZOOM = 14;
-const MAX_CENTER_TILE_POLYGONS = 420;
-const MAX_NEIGHBOR_TILE_POLYGONS = 18;
+const HOTSPOT_TILE_URL = "http://54.180.111.192:3000/hotspots/{z}/{x}/{y}";
+const HOTSPOT_MIN_ZOOM = 8;
+const HOTSPOT_MAX_ZOOM = 18;
+const DEFAULT_HOTSPOT_ZOOM = 14;
 const NEIGHBOR_TILE_OFFSETS = [-1, 0, 1] as const;
 const hotspotTileCache = new Map<string, Promise<HotspotPolygon[]>>();
+
+type HotspotLod = HotspotPolygon["lod"];
+
+type HotspotLayerConfig = {
+  lod: HotspotLod;
+  maxCenterPolygons: number;
+  maxNeighborPolygons: number;
+  sourceLayer: string;
+};
 
 type TileCoordinate = {
   z: number;
@@ -18,8 +25,12 @@ type TileCoordinate = {
   y: number;
 };
 
-type TileRequest = TileCoordinate & {
+type TileLayerRequest = HotspotLayerConfig & {
   maxPolygons: number;
+};
+
+type TileRequest = TileCoordinate & {
+  layers: TileLayerRequest[];
 };
 
 type HotspotProgressPhase = "center" | "complete";
@@ -57,11 +68,35 @@ type GeoJsonFeature = {
   properties?: Record<string, unknown>;
 };
 
-export async function getHotspotPolygonsNear(point: {
-  latitude: number;
-  longitude: number;
-}): Promise<HotspotPolygon[]> {
-  return getHotspotPolygonsNearProgressive(point);
+const HOTSPOT_LAYER_CONFIGS: HotspotLayerConfig[] = [
+  {
+    lod: "res7",
+    maxCenterPolygons: 120,
+    maxNeighborPolygons: 12,
+    sourceLayer: "hotspots_res7",
+  },
+  {
+    lod: "res9",
+    maxCenterPolygons: 420,
+    maxNeighborPolygons: 18,
+    sourceLayer: "hotspots_res9",
+  },
+  {
+    lod: "res11",
+    maxCenterPolygons: 560,
+    maxNeighborPolygons: 20,
+    sourceLayer: "hotspots_res11",
+  },
+];
+
+export async function getHotspotPolygonsNear(
+  point: {
+    latitude: number;
+    longitude: number;
+  },
+  zoomLevel = DEFAULT_HOTSPOT_ZOOM
+): Promise<HotspotPolygon[]> {
+  return getHotspotPolygonsNearProgressive(point, zoomLevel);
 }
 
 export async function getHotspotPolygonsNearProgressive(
@@ -69,24 +104,35 @@ export async function getHotspotPolygonsNearProgressive(
     latitude: number;
     longitude: number;
   },
+  zoomLevel = DEFAULT_HOTSPOT_ZOOM,
   onProgress?: (polygons: HotspotPolygon[], phase: HotspotProgressPhase) => void
 ): Promise<HotspotPolygon[]> {
-  const center = lonLatToTile(point.longitude, point.latitude, HOTSPOT_ZOOM);
-  const centerTile = {
+  const tileZoom = getHotspotDataZoom(zoomLevel);
+  const layerConfigs = getActiveHotspotLayerConfigs(zoomLevel);
+  const center = lonLatToTile(point.longitude, point.latitude, tileZoom);
+  const centerTile: TileRequest = {
     ...center,
-    maxPolygons: MAX_CENTER_TILE_POLYGONS,
+    layers: layerConfigs.map((layer) => ({
+      ...layer,
+      maxPolygons: layer.maxCenterPolygons,
+    })),
   };
-  const neighborTiles = getNeighborTiles(center)
+  const neighborTiles: TileRequest[] = getNeighborTiles(center)
     .filter((tile) => tile.x !== center.x || tile.y !== center.y)
     .map((tile) => ({
       ...tile,
-      maxPolygons: MAX_NEIGHBOR_TILE_POLYGONS,
+      layers: layerConfigs.map((layer) => ({
+        ...layer,
+        maxPolygons: layer.maxNeighborPolygons,
+      })),
     }));
   const tiles = [centerTile, ...neighborTiles];
   logHotspotDebug("load-near", {
     center,
+    layers: layerConfigs.map((layer) => layer.sourceLayer),
     point,
     tiles: tiles.map((tile) => formatTile(tile)),
+    zoomLevel,
   });
 
   let centerPolygons: HotspotPolygon[] = [];
@@ -117,10 +163,13 @@ export async function getHotspotPolygonsNearProgressive(
     });
     return [];
   });
-  const failedTileCount = tileResults.filter(
-    (result) => result.status === "rejected"
-  ).length + (centerError ? 1 : 0);
-  const polygons = [...centerPolygons, ...tilePolygons.flat()];
+  const failedTileCount =
+    tileResults.filter((result) => result.status === "rejected").length +
+    (centerError ? 1 : 0);
+  const polygons = dedupeHotspotPolygons([
+    ...centerPolygons,
+    ...tilePolygons.flat(),
+  ]);
 
   if (polygons.length === 0) {
     const firstError = tileResults.find(
@@ -143,22 +192,31 @@ export async function getHotspotPolygonsNearProgressive(
   return polygons;
 }
 
-export function getHotspotTileKey(point: {
-  latitude: number;
-  longitude: number;
-}): string {
-  const center = lonLatToTile(point.longitude, point.latitude, HOTSPOT_ZOOM);
-  return `${center.z}:${center.x}:${center.y}`;
+export function getHotspotTileKey(
+  point: {
+    latitude: number;
+    longitude: number;
+  },
+  zoomLevel = DEFAULT_HOTSPOT_ZOOM
+): string {
+  const tileZoom = getHotspotDataZoom(zoomLevel);
+  const center = lonLatToTile(point.longitude, point.latitude, tileZoom);
+  const layers = getActiveHotspotLayerConfigs(zoomLevel)
+    .map((layer) => layer.lod)
+    .join(",");
+  return `${center.z}:${center.x}:${center.y}:${layers}`;
 }
 
 async function getHotspotPolygonsForTile(
   tile: TileRequest
 ): Promise<HotspotPolygon[]> {
-  const cacheKey = `${formatTile(tile)}:${tile.maxPolygons}`;
+  const cacheKey = `${formatTile(tile)}:${tile.layers
+    .map((layer) => `${layer.sourceLayer}:${layer.maxPolygons}`)
+    .join("|")}`;
   const cached = hotspotTileCache.get(cacheKey);
   if (cached) {
     logHotspotDebug("cache-hit", {
-      maxPolygons: tile.maxPolygons,
+      layers: tile.layers.map((layer) => layer.sourceLayer),
       tile: formatTile(tile),
     });
     return cached;
@@ -178,7 +236,7 @@ async function requestHotspotPolygonsForTile(
   const url = getHotspotTileUrl(tile);
   const startedAt = Date.now();
   logHotspotDebug("request", {
-    maxPolygons: tile.maxPolygons,
+    layers: tile.layers.map((layer) => layer.sourceLayer),
     tile: formatTile(tile),
     url,
   });
@@ -225,12 +283,25 @@ async function requestHotspotPolygonsForTile(
     });
     return [];
   }
+
   const vectorTile = new VectorTile(new Pbf(buffer));
-  const layer = vectorTile.layers[HOTSPOT_SOURCE_LAYER];
+  return tile.layers.flatMap((layerRequest) =>
+    parseHotspotLayer(vectorTile, layerRequest, tile, buffer.byteLength)
+  );
+}
+
+function parseHotspotLayer(
+  vectorTile: VectorTile,
+  layerRequest: TileLayerRequest,
+  tile: TileCoordinate,
+  byteLength: number
+): HotspotPolygon[] {
+  const layer = vectorTile.layers[layerRequest.sourceLayer];
   if (!layer) {
     logHotspotDebug("empty-tile", {
       availableLayers: Object.keys(vectorTile.layers),
       reason: "missing-layer",
+      sourceLayer: layerRequest.sourceLayer,
       tile: formatTile(tile),
     });
     return [];
@@ -265,30 +336,37 @@ async function requestHotspotPolygonsForTile(
   });
   const selectedFeatures = selectVisibleHotspotFeatures(
     rankedFeatures,
-    tile.maxPolygons
+    layerRequest.maxPolygons
   );
 
   for (const rankedFeature of selectedFeatures) {
     const feature = layer.feature(rankedFeature.index);
-    const geoJson = feature.toGeoJSON(tile.x, tile.y, tile.z) as GeoJsonFeature;
-    const rings = getOuterRings(geoJson.geometry);
-
-    rings.forEach((ring, ringIndex) => {
-      const coords = ring
+    const h3Cell = getH3Cell(feature.properties);
+    const rings = getOuterRings(
+      (feature.toGeoJSON(tile.x, tile.y, tile.z) as GeoJsonFeature).geometry
+    ).map((ring) =>
+      ring
         .map(([longitude, latitude]) => ({ latitude, longitude }))
-        .filter(isValidCoord);
+        .filter(isValidCoord)
+    );
+
+    rings.forEach((coords, ringIndex) => {
       const center = getRingCenter(coords);
 
       if (coords.length >= 3 && center) {
+        const id = h3Cell
+          ? `${layerRequest.lod}-${h3Cell}`
+          : `${layerRequest.lod}-${tile.z}-${tile.x}-${tile.y}-${rankedFeature.index}-${ringIndex}`;
         polygons.push({
           blobCoords: getOrganicBlobCoords(
             center,
             rankedFeature.trashScore,
-            `${tile.z}-${tile.x}-${tile.y}-${rankedFeature.index}-${ringIndex}`
+            id
           ),
           center,
           coords,
-          id: `${tile.z}-${tile.x}-${tile.y}-${rankedFeature.index}-${ringIndex}`,
+          id,
+          lod: layerRequest.lod,
           trashScore: rankedFeature.trashScore,
         });
         stats.polygonCount += 1;
@@ -297,9 +375,10 @@ async function requestHotspotPolygonsForTile(
   }
 
   logHotspotDebug("parsed", {
-    byteLength: buffer.byteLength,
-    maxPolygons: tile.maxPolygons,
+    byteLength,
+    maxPolygons: layerRequest.maxPolygons,
     selectedFeatureCount: selectedFeatures.length,
+    sourceLayer: layerRequest.sourceLayer,
     stats,
     tile: formatTile(tile),
   });
@@ -347,6 +426,81 @@ function selectVisibleHotspotFeatures(
   return selected
     .slice(0, maxPolygons)
     .sort((a, b) => a.trashScore - b.trashScore);
+}
+
+function getActiveHotspotLayerConfigs(zoomLevel: number): HotspotLayerConfig[] {
+  return HOTSPOT_LAYER_CONFIGS.filter(
+    (layer) => getHotspotLayerFillOpacity(layer.lod, zoomLevel) > 0
+  );
+}
+
+function getHotspotDataZoom(zoomLevel: number): number {
+  const safeZoom = Number.isFinite(zoomLevel) ? zoomLevel : DEFAULT_HOTSPOT_ZOOM;
+  return clamp(Math.round(safeZoom), HOTSPOT_MIN_ZOOM, HOTSPOT_MAX_ZOOM);
+}
+
+export function getHotspotLayerFillOpacity(
+  lod: HotspotLod,
+  zoomLevel: number
+): number {
+  if (lod === "res7") {
+    if (zoomLevel <= 12) return 0.45;
+    if (zoomLevel >= 12.8) return 0;
+    return interpolate(zoomLevel, 12, 12.8, 0.45, 0);
+  }
+
+  if (lod === "res9") {
+    if (zoomLevel <= 12) return 0;
+    if (zoomLevel < 12.8) return interpolate(zoomLevel, 12, 12.8, 0, 0.6);
+    if (zoomLevel <= 16.5) return 0.6;
+    if (zoomLevel >= 17.2) return 0;
+    return interpolate(zoomLevel, 16.5, 17.2, 0.6, 0);
+  }
+
+  if (zoomLevel <= 16.5) return 0;
+  if (zoomLevel >= 17.2) return 0.55;
+  return interpolate(zoomLevel, 16.5, 17.2, 0, 0.55);
+}
+
+export function getHotspotFillColor(
+  trashScore: number,
+  lod: HotspotLod,
+  zoomLevel: number
+): string {
+  return getTrashScoreColor(
+    trashScore,
+    getHotspotLayerFillOpacity(lod, zoomLevel)
+  );
+}
+
+export function getHotspotOutlineColor(
+  lod: HotspotLod,
+  zoomLevel: number
+): string {
+  if (lod === "res11") return "rgba(255, 255, 255, 0)";
+  const fillOpacity = getHotspotLayerFillOpacity(lod, zoomLevel);
+  const alpha = lod === "res7" ? fillOpacity * 0.32 : fillOpacity * 0.42;
+  return `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
+}
+
+export function getHotspotOutlineWidth(lod: HotspotLod): number {
+  if (lod === "res11") return 0;
+  return lod === "res7" ? 0.8 : 1;
+}
+
+function getTrashScoreColor(trashScore: number, opacity: number): string {
+  const score = clamp(trashScore, 0, 1);
+  const blue = { r: 51, g: 204, b: 255 };
+  const orange = { r: 255, g: 153, b: 0 };
+  const red = { r: 255, g: 51, b: 102 };
+  const from = score < 0.5 ? blue : orange;
+  const to = score < 0.5 ? orange : red;
+  const localProgress = score < 0.5 ? score / 0.5 : (score - 0.5) / 0.5;
+  const r = Math.round(interpolate(localProgress, 0, 1, from.r, to.r));
+  const g = Math.round(interpolate(localProgress, 0, 1, from.g, to.g));
+  const b = Math.round(interpolate(localProgress, 0, 1, from.b, to.b));
+
+  return `rgba(${r}, ${g}, ${b}, ${clamp(opacity, 0, 1).toFixed(3)})`;
 }
 
 function getHotspotTileUrl(tile: TileCoordinate): string {
@@ -403,9 +557,7 @@ function wrapTileX(x: number, scale: number): number {
   return ((x % scale) + scale) % scale;
 }
 
-function getOuterRings(
-  geometry: GeoJsonFeature["geometry"]
-): number[][][] {
+function getOuterRings(geometry: GeoJsonFeature["geometry"]): number[][][] {
   if (!geometry) return [];
   if (geometry.type === "Polygon") {
     return geometry.coordinates[0] ? [geometry.coordinates[0]] : [];
@@ -416,9 +568,26 @@ function getOuterRings(
 }
 
 function getTrashScore(properties: Record<string, unknown> | undefined): number {
-  const value = properties?.trash_score;
+  const value = properties?.trash_score_avg ?? properties?.trash_score;
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
   return clamp(value, 0, 1);
+}
+
+function getH3Cell(properties: Record<string, unknown> | undefined): string | null {
+  const value = properties?.h3_cell;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function dedupeHotspotPolygons(polygons: HotspotPolygon[]): HotspotPolygon[] {
+  const deduped = new Map<string, HotspotPolygon>();
+
+  polygons.forEach((polygon) => {
+    if (!deduped.has(polygon.id)) {
+      deduped.set(polygon.id, polygon);
+    }
+  });
+
+  return [...deduped.values()];
 }
 
 function isValidCoord(coord: {
@@ -431,22 +600,6 @@ function isValidCoord(coord: {
     Math.abs(coord.latitude) <= 90 &&
     Math.abs(coord.longitude) <= 180
   );
-}
-
-export function getHotspotColor(trashScore: number): string {
-  if (trashScore >= 0.8) return "rgba(185, 28, 28, 0.90)";
-  if (trashScore >= 0.6) return "rgba(239, 68, 68, 0.70)";
-  if (trashScore >= 0.3) return "rgba(249, 115, 22, 0.50)";
-  if (trashScore > 0) return "rgba(234, 179, 8, 0.30)";
-  return "rgba(34, 197, 94, 0.05)";
-}
-
-export function getHotspotBlobColor(trashScore: number): string {
-  if (trashScore >= 0.85) return "rgba(185, 28, 28, 0.13)";
-  if (trashScore >= 0.7) return "rgba(239, 68, 68, 0.11)";
-  if (trashScore >= 0.55) return "rgba(249, 115, 22, 0.10)";
-  if (trashScore >= 0.35) return "rgba(250, 204, 21, 0.10)";
-  return "rgba(34, 197, 94, 0.08)";
 }
 
 export function getHotspotBlobRadius(trashScore: number): number {
@@ -510,6 +663,18 @@ function seededNoise(seed: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0) / 4294967295;
+}
+
+function interpolate(
+  value: number,
+  inputMin: number,
+  inputMax: number,
+  outputMin: number,
+  outputMax: number
+): number {
+  if (inputMax === inputMin) return outputMax;
+  const progress = clamp((value - inputMin) / (inputMax - inputMin), 0, 1);
+  return outputMin + (outputMax - outputMin) * progress;
 }
 
 function clamp(value: number, min: number, max: number): number {

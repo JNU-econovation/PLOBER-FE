@@ -6,15 +6,21 @@ export type GetRecommendedRouteRequest = {
   lat: number;
   lon: number;
   time: number;
-  mode: RouteRecommendationMode;
+  mode?: RouteRecommendationMode;
 };
 
-export type GetRecommendedRouteResponse = {
+export type RecommendedRouteResponse = {
   distanceMeter: number;
-  timeMillis: number;
   encodedPath: string;
+  ploggingScore: number;
+  timeMillis: number;
 };
 
-export type RecommendedRoute = GetRecommendedRouteResponse & {
+export type GetRecommendedRoutesResponse = {
+  routes: RecommendedRouteResponse[];
+};
+
+export type RecommendedRoute = RecommendedRouteResponse & {
+  id: string;
   routePoints: RoutePoint[];
 };

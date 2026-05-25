@@ -9,12 +9,8 @@ import * as Location from "expo-location";
 
 // 부정확한 좌표는 지도 카메라 점프를 유발하므로 버린다.
 const ACCURACY_THRESHOLD_METERS = 50;
-// TODO: 히트맵 QA가 끝나면 false로 돌려 실제 기기 위치를 사용한다.
-const FORCE_CNU_LOCATION_FOR_HEATMAP_QA = true;
-const CNU_TEST_POSITION = {
-  latitude: 35.1768,
-  longitude: 126.9102,
-};
+// 첫 위치가 잡히기 전에는 실내 GPS 오차를 감안해 조금 더 관대하게 받는다.
+const INITIAL_ACCURACY_THRESHOLD_METERS = 200;
 
 export type DevicePosition = {
   latitude: number;
@@ -47,19 +43,7 @@ export function DeviceLocationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
     let cancelled = false;
-
-    if (__DEV__ && FORCE_CNU_LOCATION_FOR_HEATMAP_QA) {
-      setState({
-        permission: "granted",
-        position: {
-          ...CNU_TEST_POSITION,
-          accuracy: 5,
-          timestamp: Date.now(),
-        },
-      });
-      console.log("[device-location] forced CNU test position", CNU_TEST_POSITION);
-      return;
-    }
+    let hasResolvedPosition = false;
 
     (async () => {
       try {
@@ -85,8 +69,11 @@ export function DeviceLocationProvider({ children }: { children: ReactNode }) {
 
         const lastKnownAccurate =
           lastKnown &&
-          (lastKnown.coords.accuracy ?? Number.POSITIVE_INFINITY) <
-            ACCURACY_THRESHOLD_METERS;
+          isAccurateEnough(
+            lastKnown.coords.accuracy,
+            INITIAL_ACCURACY_THRESHOLD_METERS
+          );
+        hasResolvedPosition = Boolean(lastKnownAccurate);
 
         setState({
           permission: "granted",
@@ -114,12 +101,16 @@ export function DeviceLocationProvider({ children }: { children: ReactNode }) {
             timeInterval: 3_000,
           },
           (event) => {
+            const accuracyThreshold = hasResolvedPosition
+              ? ACCURACY_THRESHOLD_METERS
+              : INITIAL_ACCURACY_THRESHOLD_METERS;
             if (
               typeof event.coords.accuracy === "number" &&
-              event.coords.accuracy > ACCURACY_THRESHOLD_METERS
+              event.coords.accuracy > accuracyThreshold
             ) {
               return;
             }
+            hasResolvedPosition = true;
             setState({
               permission: "granted",
               position: {
@@ -153,6 +144,10 @@ export function DeviceLocationProvider({ children }: { children: ReactNode }) {
       {children}
     </DeviceLocationContext.Provider>
   );
+}
+
+function isAccurateEnough(accuracy: number | null, threshold: number): boolean {
+  return typeof accuracy !== "number" || accuracy <= threshold;
 }
 
 export function useDeviceLocation(): DeviceLocationState {

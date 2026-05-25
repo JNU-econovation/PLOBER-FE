@@ -13,7 +13,10 @@ type HotspotPolygonsState =
   | { status: "success"; polygons: HotspotPolygon[] }
   | { status: "error"; message: string; polygons: HotspotPolygon[] };
 
-export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
+export function useHotspotPolygons(
+  enabled: boolean,
+  zoomLevel: number
+): HotspotPolygonsState {
   const { permission, position } = useDeviceLocation();
   const [state, setState] = useState<HotspotPolygonsState>({
     polygons: [],
@@ -43,7 +46,7 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
       return;
     }
 
-    const key = getHotspotTileKey(position);
+    const key = getHotspotTileKey(position, zoomLevel);
     if (fetchedKeyRef.current === key) {
       logHotspotHookDebug("skip-same-tile", { key, position });
       return;
@@ -54,15 +57,22 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
     logHotspotHookDebug("load-start", { key, position });
     setState((prev) => ({ polygons: prev.polygons, status: "loading" }));
 
-    getHotspotPolygonsNearProgressive(position, (polygons, phase) => {
-      if (!mounted) return;
-      logHotspotHookDebug("load-progress", {
-        key,
-        phase,
-        polygonCount: polygons.length,
-      });
-      setState({ polygons, status: phase === "complete" ? "success" : "loading" });
-    })
+    getHotspotPolygonsNearProgressive(
+      position,
+      zoomLevel,
+      (polygons, phase) => {
+        if (!mounted) return;
+        logHotspotHookDebug("load-progress", {
+          key,
+          phase,
+          polygonCount: polygons.length,
+        });
+        setState({
+          polygons,
+          status: phase === "complete" ? "success" : "loading",
+        });
+      }
+    )
       .then((polygons) => {
         if (!mounted) return;
         logHotspotHookDebug("load-success", {
@@ -94,7 +104,7 @@ export function useHotspotPolygons(enabled: boolean): HotspotPolygonsState {
     return () => {
       mounted = false;
     };
-  }, [enabled, permission, position]);
+  }, [enabled, permission, position, zoomLevel]);
 
   return state;
 }

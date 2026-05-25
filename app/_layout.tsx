@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AuthSessionProvider, useAuthSession } from "@/src/features/auth";
 import { PloggingSessionProvider } from "@/src/features/plogging-session/hooks/use-plogging-session";
+import "@/src/features/plogging-session/services/plogging-background-location-task";
 import { DeviceLocationProvider } from "@/src/shared/location";
 import { colors } from "@/src/shared/theme";
 

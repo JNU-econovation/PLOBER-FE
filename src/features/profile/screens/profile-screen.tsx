@@ -42,7 +42,7 @@ import {
   uploadProfileImageToS3,
 } from "../services";
 
-const MAX_EXPERIENCE_PROGRESS = 100;
+const EXPERIENCE_PROGRESS_UNIT = 720;
 const PHOTO_LIBRARY_PERMISSION_ERROR = "사진 접근 권한이 필요합니다.";
 
 type AccountAction = "logout" | "delete" | null;
@@ -732,7 +732,9 @@ function formatTenThousandSteps(stepCount: number) {
 function getExperienceProgressPercent(experience: number) {
   if (!Number.isFinite(experience)) return 0;
 
-  return Math.max(0, Math.min(experience, MAX_EXPERIENCE_PROGRESS));
+  const progressPercent = (experience / EXPERIENCE_PROGRESS_UNIT) * 100;
+
+  return Math.max(0, Math.min(progressPercent, 100));
 }
 
 function getSummaryStats(stats: MyPloggingStats | null): SummaryStat[] {

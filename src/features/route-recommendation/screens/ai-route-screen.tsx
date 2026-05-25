@@ -27,15 +27,13 @@ import { useRecommendedRoute } from "../hooks/use-recommended-route";
 
 type RouteCardState =
   | { status: "loading" }
-  | { status: "success"; route: RecommendedRoute }
   | { status: "error"; message: string; onRetry: () => void };
 
 const MAP_CONTROL_TOP_OFFSET = 131;
 const HEATMAP_LEGEND_TOP_OFFSET = 112;
 const ROUTE_CARD_GAP = 28;
-const ROUTE_CARD_HEIGHT = 86;
+const ROUTE_CARD_HEIGHT = 104;
 const START_BUTTON_HEIGHT = 98;
-const ROUTE_CARD_TITLE = "시간 우선 경로";
 
 export function AiRouteScreen() {
   const router = useRouter();
@@ -48,6 +46,7 @@ export function AiRouteScreen() {
   const timeMinutes = parseRouteTimeMinutes(params.time);
   const recommendedRoute = useRecommendedRoute({ timeMinutes });
   const [heatmapVisible, setHeatmapVisible] = useState(false);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const {
     noNearbyToiletsMessage,
     noNearbyToiletsNoticeVisible,
@@ -55,6 +54,11 @@ export function AiRouteScreen() {
     toggleRestroom,
     toiletMarkers,
   } = useRestroomToggle();
+  const selectedRoute =
+    recommendedRoute.status === "success"
+      ? recommendedRoute.routes.find((route) => route.id === selectedRouteId) ??
+        recommendedRoute.routes[0]
+      : null;
 
   return (
     <ScreenRoot>
@@ -65,12 +69,8 @@ export function AiRouteScreen() {
         dimmed
         heatmapLegendTop={Math.max(insets.top, 44) + HEATMAP_LEGEND_TOP_OFFSET}
         heatmapVisible={heatmapVisible}
-        routePoints={
-          recommendedRoute.status === "success"
-            ? recommendedRoute.route.routePoints
-            : undefined
-        }
-        routeVisible={recommendedRoute.status === "success"}
+        routePoints={selectedRoute?.routePoints}
+        routeVisible={Boolean(selectedRoute)}
         toilets={toiletMarkers}
         zoom={15.1}
       >
@@ -86,7 +86,7 @@ export function AiRouteScreen() {
           message={noNearbyToiletsMessage}
           visible={noNearbyToiletsNoticeVisible}
         />
-        
+
         <ScrollView
           contentContainerStyle={styles.routeCardsContent}
           horizontal
@@ -94,11 +94,15 @@ export function AiRouteScreen() {
           style={styles.routeCards}
         >
           {recommendedRoute.status === "success" ? (
-            <RouteOptionCard
-              route={recommendedRoute.route}
-              selected
-              title={ROUTE_CARD_TITLE}
-            />
+            recommendedRoute.routes.map((route, index) => (
+              <RouteOptionCard
+                key={route.id}
+                onPress={() => setSelectedRouteId(route.id)}
+                route={route}
+                selected={route.id === selectedRoute?.id}
+                title={getRouteTitle(route, index)}
+              />
+            ))
           ) : (
             <RouteStatusCard
               state={
@@ -114,19 +118,19 @@ export function AiRouteScreen() {
           )}
         </ScrollView>
         <RouteStartButton
-          disabled={recommendedRoute.status !== "success"}
+          disabled={!selectedRoute}
           onPress={() => {
-            if (recommendedRoute.status !== "success") return;
+            if (!selectedRoute) return;
             setSessionMode("RECOMMENDED");
-            setRecommendedRoutePoints(recommendedRoute.route.routePoints);
+            setRecommendedRoutePoints(selectedRoute.routePoints);
             router.push({
               pathname: "/plogging",
-              params: { routeId: "recommended" },
+              params: { routeId: selectedRoute.id },
             });
           }}
           title={
-            recommendedRoute.status === "success"
-              ? "플로깅 시작하기"
+            selectedRoute
+              ? "선택한 코스로 시작하기"
               : "추천 경로를 불러오는 중"
           }
         />
@@ -196,28 +200,47 @@ function RouteStatusCard({
 }
 
 function RouteOptionCard({
+  onPress,
   route,
   selected,
   title,
 }: {
+  onPress: () => void;
   route: RecommendedRoute;
   selected: boolean;
   title: string;
 }) {
   return (
-    <View
-      accessibilityLabel={title}
-      style={[styles.routeCard, selected ? styles.routeCardActive : null]}
+    <Pressable
+      accessibilityLabel={`${title} ${route.ploggingScore}점`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.routeCard,
+        selected ? styles.routeCardActive : null,
+        pressed ? styles.pressed : null,
+      ]}
     >
-      <Text
-        numberOfLines={1}
-        style={[
-          styles.routeCardTitle,
-          selected ? styles.routeCardTitleActive : styles.routeCardTitleMuted,
-        ]}
-      >
-        {title}
-      </Text>
+      <View style={styles.routeCardHeader}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.routeCardTitle,
+            selected ? styles.routeCardTitleActive : styles.routeCardTitleMuted,
+          ]}
+        >
+          {title}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.routeScoreBadge,
+            selected ? styles.routeScoreBadgeActive : styles.routeScoreBadgeMuted,
+          ]}
+        >
+          {route.ploggingScore}점
+        </Text>
+      </View>
       <View style={styles.routeCardMetricRow}>
         <Text
           style={[
@@ -241,7 +264,7 @@ function RouteOptionCard({
           {formatDistanceKm(route.distanceMeter)}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -280,6 +303,13 @@ function formatMinutes(timeMillis: number): number {
 
 function formatDistanceKm(distanceMeter: number): string {
   return `${(distanceMeter / 1000).toFixed(1).replace(/\.0$/, "")}km`;
+}
+
+function getRouteTitle(route: RecommendedRoute, index: number): string {
+  if (index === 0 || route.ploggingScore >= 80) return "최고 추천 코스";
+  if (route.ploggingScore >= 60) return "균형 추천 코스";
+  if (route.ploggingScore >= 40) return "여유로운 코스";
+  return "가벼운 탐색 코스";
 }
 
 function parseRouteTimeMinutes(rawTime: string | undefined): number {
@@ -322,9 +352,10 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     boxShadow: "0 0 15.35px rgba(0, 0, 0, 0.05)",
     height: ROUTE_CARD_HEIGHT,
-    paddingHorizontal: 15,
-    paddingTop: 13,
-    width: 149,
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    width: 166,
   },
   routeCardActive: {
     borderColor: colors.primary,
@@ -348,7 +379,7 @@ const styles = StyleSheet.create({
     color: "#A3A3A3",
   },
   routeCardMetric: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: "400",
     letterSpacing: 0,
   },
@@ -362,15 +393,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     gap: 6,
-    marginTop: 9,
   },
   routeCardMinute: {
     fontSize: 18,
   },
   routeCardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
     letterSpacing: 0,
+    width: "100%",
   },
   routeCardTitleActive: {
     color: "#0A0A0A",
@@ -387,6 +418,27 @@ const styles = StyleSheet.create({
   routeCardsContent: {
     gap: 12,
     paddingHorizontal: 24,
+  },
+  routeCardHeader: {
+    alignItems: "flex-start",
+    gap: 5,
+  },
+  routeScoreBadge: {
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  routeScoreBadgeActive: {
+    backgroundColor: colors.primary,
+    color: colors.surface,
+  },
+  routeScoreBadgeMuted: {
+    backgroundColor: "#F4F4F5",
+    color: "#52525B",
   },
   title: {
     color: "#0A0A0A",

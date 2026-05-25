@@ -3,23 +3,23 @@ import { apiClient } from "@/src/shared/api";
 import { decodePolyline } from "./polyline";
 import type {
   GetRecommendedRouteRequest,
-  GetRecommendedRouteResponse,
+  GetRecommendedRoutesResponse,
   RecommendedRoute,
 } from "./types";
 
 const RECOMMENDED_ROUTE_PATH = "/api/v1/routes";
 
-export async function getRecommendedRoute(
+export async function getRecommendedRoutes(
   params: GetRecommendedRouteRequest
-): Promise<RecommendedRoute> {
-  const response = await apiClient.get<GetRecommendedRouteResponse>(
+): Promise<RecommendedRoute[]> {
+  const response = await apiClient.get<GetRecommendedRoutesResponse>(
     RECOMMENDED_ROUTE_PATH,
     { params }
   );
-  const routePoints = decodePolyline(response.data.encodedPath);
 
-  return {
-    ...response.data,
-    routePoints,
-  };
+  return response.data.routes.map((route, index) => ({
+    ...route,
+    id: `recommended-${index + 1}`,
+    routePoints: decodePolyline(route.encodedPath),
+  }));
 }

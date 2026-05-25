@@ -1,0 +1,2468 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plover - AI 플로깅 도우미</title>
+    <meta
+      name="description"
+      content="AI 경로 추천부터 기록 관리까지, 걷는 습관을 환경 행동으로 바꾸는 플로깅 앱 Plover 소개 페이지"
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f7df4'/%3E%3Cpath d='M16 42c10 0 8-13 18-13s8-13 18-13' fill='none' stroke='white' stroke-width='7' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='42' r='5' fill='white'/%3E%3Ccircle cx='34' cy='29' r='5' fill='white'/%3E%3Ccircle cx='52' cy='16' r='5' fill='white'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        --blue: #2f7df4;
+        --blue-2: #1f6be8;
+        --blue-3: #74b7ff;
+        --ink: #172233;
+        --ink-2: #273548;
+        --muted: #637083;
+        --line: #e5ebf5;
+        --soft: #f5f9ff;
+        --white: #ffffff;
+        --green: #86d68a;
+        --orange: #cc8a63;
+        --shadow: 0 22px 60px rgba(25, 47, 80, 0.12);
+        --shadow-soft: 0 16px 42px rgba(25, 47, 80, 0.09);
+        --radius: 22px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, rgba(247, 251, 255, 0.82), rgba(255, 255, 255, 0.96) 28%),
+          #fff;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+          "Malgun Gothic", "Segoe UI", sans-serif;
+        letter-spacing: 0;
+        word-break: keep-all;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .page {
+        overflow: hidden;
+        min-width: 320px;
+      }
+
+      .container {
+        width: min(1490px, calc(100% - 80px));
+        margin: 0 auto;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        border-bottom: 1px solid rgba(218, 227, 241, 0.85);
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(18px);
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 96px;
+        gap: 28px;
+      }
+
+      .brand {
+        color: var(--blue);
+        font-size: 34px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 62px;
+        color: #111a28;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        color: #111a28;
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 58px;
+        padding: 0 34px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        font-size: 19px;
+        font-weight: 900;
+        line-height: 1;
+        cursor: pointer;
+        transition:
+          transform 180ms ease,
+          box-shadow 180ms ease,
+          background 180ms ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+      }
+
+      .btn-primary {
+        color: #fff;
+        background: linear-gradient(180deg, #367ff5, #276ee8);
+        box-shadow: 0 14px 28px rgba(47, 125, 244, 0.24);
+      }
+
+      .btn-ghost {
+        color: var(--blue);
+        border-color: var(--blue);
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      .section {
+        position: relative;
+        padding: 92px 0;
+      }
+
+      .hero {
+        min-height: 850px;
+        padding: 78px 0 82px;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.74) 54%, rgba(245, 250, 255, 0.92) 100%),
+          radial-gradient(circle at 74% 38%, rgba(47, 125, 244, 0.08), transparent 32%);
+      }
+
+      .hero::before,
+      .section-map::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.58;
+        background-image:
+          linear-gradient(28deg, transparent 48%, rgba(181, 210, 248, 0.6) 49%, transparent 51%),
+          linear-gradient(108deg, transparent 48%, rgba(181, 210, 248, 0.45) 49%, transparent 51%),
+          linear-gradient(168deg, transparent 48%, rgba(181, 210, 248, 0.35) 49%, transparent 51%);
+        background-size: 420px 260px, 500px 320px, 580px 360px;
+        background-position: 64% 22%, 74% 54%, 92% 8%;
+      }
+
+      .hero::after,
+      .why::after {
+        content: "";
+        position: absolute;
+        right: -70px;
+        top: 210px;
+        width: 760px;
+        height: 230px;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg width='760' height='230' viewBox='0 0 760 230' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 86C73 16 114 214 198 120C281 27 350 26 431 87C512 148 588 195 758 112' stroke='%239ec7ff' stroke-width='3' stroke-dasharray='8 12' stroke-linecap='round' opacity='.55'/%3E%3Ccircle cx='92' cy='84' r='10' fill='%232f7df4' opacity='.26'/%3E%3Cpath d='M92 50c20 0 36 16 36 36 0 27-36 68-36 68S56 113 56 86c0-20 16-36 36-36Z' fill='%232f7df4' opacity='.24'/%3E%3Ccircle cx='92' cy='86' r='13' fill='%23fff' opacity='.9'/%3E%3C/svg%3E");
+        background-size: contain;
+        background-repeat: no-repeat;
+      }
+
+      .hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 1fr 760px;
+        align-items: center;
+        gap: 70px;
+      }
+
+      .eyebrow {
+        display: block;
+        margin-bottom: 34px;
+        color: var(--blue);
+        font-size: 24px;
+        font-weight: 900;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .hero-title,
+      .section-title {
+        color: #182231;
+        font-size: 72px;
+        font-weight: 950;
+        line-height: 1.18;
+      }
+
+      .hero-copy,
+      .section-copy {
+        margin-top: 38px;
+        color: #5f6d81;
+        font-size: 25px;
+        font-weight: 600;
+        line-height: 1.65;
+      }
+
+      .hero-actions {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        margin-top: 52px;
+      }
+
+      .hero-actions .btn {
+        width: 270px;
+        height: 64px;
+      }
+
+      .feature-pills {
+        display: flex;
+        gap: 16px;
+        margin-top: 44px;
+      }
+
+      .feature-pill {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 178px;
+        padding: 20px 26px;
+        border: 1px solid rgba(226, 233, 244, 0.95);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: var(--shadow-soft);
+        color: #172233;
+        font-size: 17px;
+        font-weight: 900;
+      }
+
+      .hero-phones {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 42px;
+      }
+
+      .hero-phones .phone:nth-child(1) {
+        margin-top: 24px;
+      }
+
+      .hero-phones .phone:nth-child(2) {
+        margin-bottom: 18px;
+      }
+
+      .phone {
+        width: 340px;
+        height: 680px;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border: 1px solid #dce5f1;
+        border-radius: 34px;
+        background: #fff;
+        box-shadow: 0 28px 72px rgba(18, 34, 56, 0.16);
+      }
+
+      .phone.small {
+        width: 272px;
+        height: 544px;
+        border-radius: 28px;
+      }
+
+      .phone.tiny {
+        width: 224px;
+        height: 448px;
+        border-radius: 24px;
+      }
+
+      .phone-screen {
+        position: relative;
+        height: 100%;
+        padding: 22px 22px 20px;
+        background: #fbfdff;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 22px;
+        margin-bottom: 20px;
+        color: #0d1522;
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .phone.tiny .status {
+        font-size: 10px;
+        margin-bottom: 12px;
+      }
+
+      .signal {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .signal::before,
+      .signal::after {
+        content: "";
+        display: block;
+      }
+
+      .signal::before {
+        width: 23px;
+        height: 11px;
+        background:
+          linear-gradient(90deg, #111 3px, transparent 3px 6px, #111 6px 10px, transparent 10px 13px, #111 13px 18px, transparent 18px);
+        border-radius: 2px;
+      }
+
+      .signal::after {
+        width: 20px;
+        height: 9px;
+        border: 2px solid #111;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #111 70%, transparent 70%);
+      }
+
+      .screen-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        color: #111a28;
+        font-size: 18px;
+        font-weight: 950;
+        text-align: center;
+      }
+
+      .screen-title.center {
+        justify-content: center;
+      }
+
+      .screen-icon-btn {
+        display: inline-grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 0;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 4px 14px rgba(25, 47, 80, 0.12);
+      }
+
+      .map-area {
+        position: relative;
+        overflow: hidden;
+        min-height: 308px;
+        border-radius: 4px;
+        background:
+          linear-gradient(18deg, transparent 47%, rgba(203, 211, 220, 0.72) 48%, transparent 50%),
+          linear-gradient(84deg, transparent 47%, rgba(203, 211, 220, 0.7) 48%, transparent 50%),
+          linear-gradient(134deg, transparent 47%, rgba(203, 211, 220, 0.55) 48%, transparent 50%),
+          linear-gradient(0deg, rgba(108, 196, 120, 0.15) 0 22%, transparent 22% 100%),
+          #f1f4f8;
+        background-size: 220px 120px, 190px 160px, 180px 140px, 150px 120px, auto;
+        background-position: 0 0, 28px 20px, 14px 80px, 178px 74px, 0 0;
+      }
+
+      .map-area.soft {
+        filter: saturate(0.88);
+        opacity: 0.84;
+      }
+
+      .map-label {
+        position: absolute;
+        color: #7e8792;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .map-label.blue {
+        color: var(--blue);
+      }
+
+      .route-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .route-svg path {
+        fill: rgba(47, 125, 244, 0.07);
+        stroke: var(--blue);
+        stroke-width: 6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .pin {
+        position: absolute;
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--blue);
+        box-shadow: 0 10px 20px rgba(47, 125, 244, 0.28);
+      }
+
+      .pin::after {
+        content: "";
+        width: 13px;
+        height: 13px;
+        border: 4px solid currentColor;
+        border-radius: 50%;
+      }
+
+      .floating-control {
+        position: absolute;
+        right: 16px;
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 8px 18px rgba(25, 47, 80, 0.12);
+      }
+
+      .route-options {
+        position: absolute;
+        right: 22px;
+        bottom: 88px;
+        left: 22px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .route-option {
+        min-height: 84px;
+        padding: 14px 12px;
+        border: 1px solid rgba(226, 233, 244, 0.9);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 8px 18px rgba(25, 47, 80, 0.06);
+        color: #162131;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .route-option.active {
+        border-color: var(--blue);
+      }
+
+      .route-option strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 20px;
+      }
+
+      .route-option span {
+        color: #59677a;
+        font-size: 12px;
+      }
+
+      .phone-bottom-btn {
+        position: absolute;
+        right: 22px;
+        bottom: 22px;
+        left: 22px;
+        height: 64px;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #367ff5, #276ee8);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 17px;
+        font-weight: 950;
+      }
+
+      .home-controls {
+        position: absolute;
+        top: 72px;
+        left: 22px;
+        right: 22px;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .chip-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 8px 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 6px 16px rgba(25, 47, 80, 0.09);
+        color: #293445;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .home-start {
+        position: absolute;
+        left: 50%;
+        bottom: 118px;
+        z-index: 2;
+        display: grid;
+        width: 74px;
+        height: 74px;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #367ff5, #1f6be8);
+        box-shadow: 0 16px 30px rgba(47, 125, 244, 0.26);
+        color: #fff;
+        font-size: 17px;
+        font-weight: 950;
+        transform: translateX(-50%);
+      }
+
+      .report-btn {
+        position: absolute;
+        right: 32px;
+        bottom: 128px;
+        z-index: 2;
+        padding: 12px 15px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 8px 18px rgba(25, 47, 80, 0.1);
+        color: #4b596b;
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .camera-btn {
+        position: absolute;
+        left: 32px;
+        bottom: 128px;
+        z-index: 2;
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 8px 18px rgba(25, 47, 80, 0.1);
+      }
+
+      .tabbar {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: flex;
+        justify-content: space-around;
+        height: 86px;
+        padding: 24px 28px 0;
+        border-top: 1px solid rgba(226, 233, 244, 0.86);
+        background: rgba(255, 255, 255, 0.86);
+      }
+
+      .record-phone .phone-screen {
+        padding: 24px 24px 18px;
+      }
+
+      .profile-head {
+        position: relative;
+        display: grid;
+        grid-template-columns: 80px 1fr 28px;
+        gap: 18px;
+        align-items: center;
+        margin: 22px 0 18px;
+      }
+
+      .avatar {
+        display: grid;
+        width: 78px;
+        height: 78px;
+        place-items: center;
+        border-radius: 50%;
+        background: #e7f1ff;
+        color: #b7d4fb;
+      }
+
+      .profile-name {
+        color: #111a28;
+        font-size: 21px;
+        font-weight: 950;
+      }
+
+      .level {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 12px;
+        padding: 5px 10px;
+        border-radius: 11px;
+        background: var(--blue);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .progress {
+        grid-column: 2 / 4;
+        height: 5px;
+        overflow: hidden;
+        border-radius: 99px;
+        background: #e5e8ed;
+      }
+
+      .progress span {
+        display: block;
+        width: 72%;
+        height: 100%;
+        background: var(--blue);
+      }
+
+      .mini-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        margin: 20px 0;
+        padding: 22px 12px;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 10px 30px rgba(25, 47, 80, 0.08);
+      }
+
+      .mini-stats div {
+        text-align: center;
+        border-right: 1px solid var(--line);
+      }
+
+      .mini-stats div:last-child {
+        border-right: 0;
+      }
+
+      .mini-stats strong {
+        display: block;
+        font-size: 21px;
+      }
+
+      .mini-stats span {
+        display: block;
+        margin-top: 5px;
+        color: #5e6c7e;
+        font-size: 11px;
+        font-weight: 850;
+      }
+
+      .calendar {
+        padding: 22px;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 10px 30px rgba(25, 47, 80, 0.08);
+      }
+
+      .calendar-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        color: #111a28;
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .cal-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .cal-grid span {
+        position: relative;
+        display: grid;
+        min-height: 34px;
+        place-items: center;
+        border-bottom: 1px solid #e7ecf4;
+      }
+
+      .cal-grid .dow {
+        min-height: 28px;
+        color: #7a8492;
+      }
+
+      .cal-grid .dot::after {
+        content: "";
+        position: absolute;
+        bottom: 4px;
+        left: 50%;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--blue);
+        transform: translateX(-50%);
+      }
+
+      .cal-grid .empty {
+        background: rgba(0, 0, 0, 0.03);
+      }
+
+      .why {
+        padding-top: 90px;
+      }
+
+      .why-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 1fr 430px;
+        gap: 80px;
+        align-items: start;
+      }
+
+      .why .section-title {
+        max-width: 660px;
+      }
+
+      .why-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-top: -34px;
+        max-width: 930px;
+      }
+
+      .info-card {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 22px;
+        min-height: 184px;
+        padding: 28px;
+        border: 1px solid rgba(226, 233, 244, 0.95);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .icon-tile {
+        display: grid;
+        width: 76px;
+        height: 76px;
+        place-items: center;
+        border-radius: 18px;
+        color: var(--blue);
+        background: linear-gradient(180deg, #eef6ff, #e7f0ff);
+      }
+
+      .info-card h3 {
+        margin-bottom: 14px;
+        color: #182231;
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .info-card p {
+        color: #556477;
+        font-size: 16px;
+        font-weight: 650;
+        line-height: 1.75;
+      }
+
+      .stats-band {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        align-items: center;
+        width: min(930px, 100%);
+        margin-top: 22px;
+        padding: 28px 34px;
+        border: 1px solid rgba(226, 233, 244, 0.96);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.98);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .stat-item {
+        display: grid;
+        grid-template-columns: 62px 1fr;
+        align-items: center;
+        gap: 18px;
+        min-height: 72px;
+        border-right: 1px solid #dfe6f0;
+      }
+
+      .stat-item:last-child {
+        border-right: 0;
+      }
+
+      .stat-item strong {
+        color: #182231;
+        font-size: 34px;
+        font-weight: 950;
+      }
+
+      .stat-item em {
+        font-style: normal;
+        font-size: 18px;
+        font-weight: 850;
+      }
+
+      .stat-item span {
+        display: block;
+        margin-top: 4px;
+        color: #5e6c7e;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .record {
+        background: linear-gradient(180deg, #fff, #fbfdff);
+      }
+
+      .record-grid {
+        display: grid;
+        grid-template-columns: 1fr 900px;
+        gap: 68px;
+        align-items: center;
+      }
+
+      .feature-list {
+        display: grid;
+        gap: 26px;
+        margin-top: 60px;
+      }
+
+      .feature-list li {
+        display: grid;
+        grid-template-columns: 58px 1fr;
+        align-items: center;
+        gap: 24px;
+        color: #273548;
+        font-size: 18px;
+        font-weight: 850;
+        list-style: none;
+      }
+
+      .feature-list ul,
+      .feature-list {
+        padding: 0;
+      }
+
+      .record-panels {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      .record-left {
+        display: grid;
+        gap: 28px;
+      }
+
+      .summary-card {
+        overflow: hidden;
+        border: 1px solid rgba(226, 233, 244, 0.96);
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .summary-top {
+        padding: 42px 42px 34px;
+        color: #fff;
+        background: linear-gradient(145deg, #6bb8ff, #408df2);
+      }
+
+      .summary-top span {
+        display: block;
+        margin-bottom: 12px;
+        font-size: 14px;
+        font-weight: 900;
+        opacity: 0.9;
+      }
+
+      .summary-top strong {
+        font-size: 52px;
+        font-weight: 950;
+      }
+
+      .summary-top em {
+        font-style: normal;
+        font-size: 22px;
+        font-weight: 950;
+      }
+
+      .summary-line {
+        height: 2px;
+        margin: 20px 0 26px;
+        background: rgba(255, 255, 255, 0.42);
+      }
+
+      .summary-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px;
+      }
+
+      .summary-stats strong {
+        display: block;
+        font-size: 29px;
+      }
+
+      .summary-stats small {
+        display: block;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 850;
+        opacity: 0.86;
+      }
+
+      .weekly {
+        padding: 30px 42px 38px;
+      }
+
+      .weekly h3 {
+        margin-bottom: 18px;
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .bars {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        align-items: end;
+        gap: 18px;
+        height: 152px;
+      }
+
+      .bar-wrap {
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+        align-items: end;
+      }
+
+      .bar {
+        width: 40px;
+        min-height: 12px;
+        border-radius: 6px;
+        background: #d7eaff;
+      }
+
+      .bar.active {
+        background: linear-gradient(180deg, #4a91f7, #226fdf);
+      }
+
+      .bar.gray {
+        background: #e8e8e8;
+      }
+
+      .bar-wrap span {
+        color: #172233;
+        font-weight: 850;
+      }
+
+      .rank-card,
+      .detail-cta,
+      .profile-card {
+        border: 1px solid rgba(226, 233, 244, 0.96);
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .rank-card {
+        display: grid;
+        grid-template-columns: 104px 1fr;
+        gap: 28px;
+        align-items: center;
+        padding: 26px;
+      }
+
+      .rank-card .circle-icon {
+        width: 88px;
+        height: 88px;
+      }
+
+      .rank-card p {
+        color: #425064;
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .rank-card strong {
+        display: block;
+        margin: 8px 0;
+        color: #172233;
+        font-size: 30px;
+        font-weight: 950;
+      }
+
+      .profile-card {
+        padding: 30px 28px;
+      }
+
+      .profile-card .calendar {
+        box-shadow: none;
+        border: 1px solid var(--line);
+      }
+
+      .detail-cta {
+        display: grid;
+        grid-template-columns: 80px 1fr 34px;
+        align-items: center;
+        min-height: 104px;
+        margin-top: 28px;
+        padding: 24px 34px;
+      }
+
+      .detail-cta .btn-ghost {
+        width: 100%;
+        height: 56px;
+        min-height: 56px;
+        border-radius: 8px;
+        font-size: 17px;
+      }
+
+      .steps {
+        text-align: center;
+      }
+
+      .steps .eyebrow {
+        margin-bottom: 18px;
+      }
+
+      .steps .section-title {
+        font-size: 52px;
+      }
+
+      .step-row {
+        display: grid;
+        grid-template-columns: 1fr 60px 1fr 60px 1fr;
+        gap: 24px;
+        align-items: center;
+        margin-top: 36px;
+      }
+
+      .step-card {
+        min-height: 582px;
+        padding: 34px 34px 30px;
+        border: 1px solid #dfe8f5;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 16px 44px rgba(25, 47, 80, 0.06);
+        text-align: left;
+      }
+
+      .step-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #172233;
+        font-size: 24px;
+        font-weight: 950;
+      }
+
+      .number {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #367ff5, #276ee8);
+        color: #fff;
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .step-card .phone {
+        margin: 14px auto 26px;
+      }
+
+      .step-card p {
+        color: #263448;
+        font-size: 19px;
+        font-weight: 750;
+        line-height: 1.55;
+        text-align: center;
+      }
+
+      .arrow-circle {
+        display: grid;
+        width: 48px;
+        height: 48px;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #c4ddff, #84b8f9);
+        color: #fff;
+        box-shadow: 0 12px 24px rgba(47, 125, 244, 0.2);
+      }
+
+      .step-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 42px;
+        width: min(940px, 100%);
+        margin: 28px auto 0;
+      }
+
+      .step-stat {
+        display: grid;
+        grid-template-columns: 58px 1fr;
+        align-items: center;
+        gap: 20px;
+        min-height: 100px;
+        padding: 22px 36px;
+        border: 1px solid rgba(226, 233, 244, 0.96);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: var(--shadow-soft);
+        text-align: left;
+      }
+
+      .step-stat span {
+        display: block;
+        margin-bottom: 4px;
+        color: #4f5d70;
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .step-stat strong {
+        color: #182231;
+        font-size: 30px;
+        font-weight: 950;
+      }
+
+      .features .section-title {
+        font-size: 58px;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        margin-top: 30px;
+      }
+
+      .feature-card {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 28px;
+        align-items: center;
+        min-height: 344px;
+        overflow: hidden;
+        padding: 36px 44px;
+        border: 1px solid #dfe8f5;
+        border-radius: 18px;
+        background: #fff;
+      }
+
+      .feature-card h3 {
+        margin: 28px 0 18px;
+        color: #172233;
+        font-size: 30px;
+        font-weight: 950;
+      }
+
+      .feature-card p,
+      .feature-card li {
+        color: #303e51;
+        font-size: 17px;
+        font-weight: 750;
+        line-height: 1.58;
+      }
+
+      .feature-card ul {
+        display: grid;
+        gap: 14px;
+        margin: 22px 0 0;
+        padding: 0;
+      }
+
+      .feature-card li {
+        position: relative;
+        padding-left: 20px;
+        list-style: none;
+      }
+
+      .feature-card li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+
+      .setting-card,
+      .impact-card {
+        padding: 36px 42px;
+        border: 1px solid rgba(226, 233, 244, 0.96);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .setting-card {
+        display: grid;
+        gap: 24px;
+      }
+
+      .setting-title {
+        text-align: center;
+        color: #172233;
+        font-size: 16px;
+        font-weight: 950;
+      }
+
+      .setting-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #172233;
+        font-size: 20px;
+        font-weight: 800;
+      }
+
+      .setting-row strong {
+        font-size: 26px;
+      }
+
+      .spinner {
+        display: grid;
+        gap: 6px;
+      }
+
+      .tri {
+        width: 0;
+        height: 0;
+        border-right: 10px solid transparent;
+        border-left: 10px solid transparent;
+      }
+
+      .tri.up {
+        border-bottom: 14px solid #111;
+      }
+
+      .tri.down {
+        border-top: 14px solid #111;
+      }
+
+      .setting-card .btn {
+        height: 48px;
+        min-height: 48px;
+        border-radius: 8px;
+        font-size: 17px;
+      }
+
+      .impact-card h4 {
+        margin: 0 0 24px;
+        color: #172233;
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .impact-amount {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      .impact-amount strong {
+        font-size: 38px;
+        font-weight: 950;
+      }
+
+      .impact-amount small {
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      .cta {
+        padding: 92px 0 34px;
+      }
+
+      .cta-grid {
+        display: grid;
+        grid-template-columns: 1fr 360px 410px;
+        gap: 52px;
+        align-items: center;
+      }
+
+      .cta .section-title {
+        font-size: 68px;
+      }
+
+      .cta-cards {
+        display: grid;
+        gap: 28px;
+      }
+
+      .side-card {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 24px;
+        align-items: center;
+        min-height: 150px;
+        padding: 26px;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .side-card h3 {
+        margin-bottom: 12px;
+        color: #172233;
+        font-size: 24px;
+        font-weight: 950;
+      }
+
+      .side-card p {
+        color: #58667a;
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1.55;
+      }
+
+      .circle-icon {
+        display: grid;
+        width: 92px;
+        height: 92px;
+        place-items: center;
+        border-radius: 50%;
+        color: var(--blue);
+        background: #eaf3ff;
+      }
+
+      .result-phone .result-title {
+        margin: 24px 0 14px;
+        color: #172233;
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .result-card {
+        padding: 18px;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 10px 30px rgba(25, 47, 80, 0.1);
+      }
+
+      .result-card .map-area {
+        min-height: 150px;
+        margin-top: 14px;
+        border-radius: 8px;
+      }
+
+      .result-number {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .result-number strong {
+        color: #172233;
+        font-size: 28px;
+        font-weight: 950;
+      }
+
+      .result-number span {
+        color: #526075;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .result-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .result-stats div {
+        padding: 12px 10px;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 8px 20px rgba(25, 47, 80, 0.08);
+      }
+
+      .result-stats span {
+        display: block;
+        color: #5f6d81;
+        font-size: 10px;
+        font-weight: 850;
+      }
+
+      .result-stats strong {
+        display: block;
+        margin-top: 6px;
+        color: #172233;
+        font-size: 17px;
+        font-weight: 950;
+      }
+
+      .thumb-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .thumb {
+        height: 42px;
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(47, 125, 244, 0.22), rgba(255, 255, 255, 0.12)),
+          linear-gradient(45deg, #b8c6d8, #5f704b);
+      }
+
+      .thumb:nth-child(2) {
+        background:
+          linear-gradient(135deg, rgba(17, 26, 40, 0.16), rgba(255, 255, 255, 0.12)),
+          linear-gradient(45deg, #222b2f, #b88b64);
+      }
+
+      .thumb:nth-child(3) {
+        background:
+          linear-gradient(135deg, rgba(47, 125, 244, 0.14), rgba(255, 255, 255, 0.12)),
+          linear-gradient(45deg, #afb47b, #e5edf6);
+      }
+
+      .thumb:nth-child(4) {
+        background:
+          linear-gradient(135deg, rgba(47, 125, 244, 0.16), rgba(255, 255, 255, 0.12)),
+          linear-gradient(45deg, #d8c2b4, #5d463f);
+      }
+
+      .footer {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto 1fr;
+        gap: 70px;
+        align-items: center;
+        margin-top: 56px;
+        padding: 28px 0 0;
+        border-top: 1px solid #dce5f1;
+        color: #6d798b;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .footer .brand {
+        font-size: 26px;
+      }
+
+      .footer .copyright {
+        justify-self: end;
+      }
+
+      .icon {
+        width: 42px;
+        height: 42px;
+        stroke: currentColor;
+        stroke-width: 2.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        fill: none;
+      }
+
+      .icon.small {
+        width: 28px;
+        height: 28px;
+      }
+
+      .icon.large {
+        width: 56px;
+        height: 56px;
+      }
+
+      .live-panel {
+        position: absolute;
+        top: 70px;
+        left: 22px;
+        z-index: 2;
+        width: 206px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .live-panel strong {
+        display: block;
+        color: #111a28;
+        font-size: 26px;
+      }
+
+      .live-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e7ecf4;
+      }
+
+      .live-metrics span {
+        color: #5d6a7e;
+        font-size: 9px;
+        font-weight: 850;
+      }
+
+      .live-metrics b {
+        display: block;
+        color: #172233;
+        font-size: 12px;
+      }
+
+      .bottom-action-row {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        left: 18px;
+        z-index: 3;
+        display: grid;
+        grid-template-columns: 42px 1fr 52px;
+        gap: 10px;
+      }
+
+      .pill-btn {
+        display: grid;
+        place-items: center;
+        min-height: 40px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 8px 18px rgba(25, 47, 80, 0.1);
+        color: #172233;
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .pill-btn.end {
+        color: #fff;
+        background: #ef5a5a;
+      }
+
+      .floating-badge {
+        position: absolute;
+        right: 26px;
+        bottom: 146px;
+        z-index: 2;
+        display: grid;
+        width: 48px;
+        height: 48px;
+        place-items: center;
+        border: 4px solid #fff;
+        border-radius: 50%;
+        background: #ffd444;
+        box-shadow: 0 10px 20px rgba(25, 47, 80, 0.14);
+        color: #172233;
+        font-weight: 950;
+      }
+
+      .mini-map-card {
+        width: 292px;
+        max-width: 100%;
+        overflow: hidden;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .mini-map-card .phone-screen {
+        padding: 0;
+      }
+
+      .mini-map-card .screen-title {
+        padding: 18px 20px 0;
+      }
+
+      .mini-map-card .map-area {
+        min-height: 200px;
+      }
+
+      .mini-card-fade {
+        position: absolute;
+        inset: auto 0 0;
+        height: 78px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff);
+      }
+
+      @media (max-width: 1280px) {
+        .container {
+          width: min(1120px, calc(100% - 48px));
+        }
+
+        .hero-grid,
+        .record-grid,
+        .cta-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-phones {
+          justify-content: flex-start;
+        }
+
+        .why-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .why-cards {
+          margin-top: 40px;
+          max-width: none;
+        }
+
+        .stats-band {
+          width: 100%;
+        }
+
+        .record-grid {
+          align-items: stretch;
+        }
+
+        .record-panels {
+          max-width: 900px;
+        }
+
+        .cta-grid {
+          max-width: 980px;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .nav {
+          height: auto;
+          padding: 22px 0;
+        }
+
+        .nav-links {
+          display: none;
+        }
+
+        .brand {
+          font-size: 30px;
+        }
+
+        .nav-actions {
+          gap: 16px;
+          font-size: 15px;
+        }
+
+        .nav-actions .btn {
+          min-height: 46px;
+          padding: 0 18px;
+          font-size: 15px;
+        }
+
+        .section,
+        .hero,
+        .cta {
+          padding: 72px 0;
+        }
+
+        .hero-title,
+        .section-title,
+        .cta .section-title {
+          font-size: 50px;
+        }
+
+        .steps .section-title,
+        .features .section-title {
+          font-size: 42px;
+        }
+
+        .hero-copy,
+        .section-copy {
+          font-size: 20px;
+        }
+
+        .hero-actions,
+        .feature-pills {
+          flex-wrap: wrap;
+        }
+
+        .hero-actions .btn {
+          width: 230px;
+        }
+
+        .hero-phones {
+          flex-wrap: wrap;
+        }
+
+        .why-cards,
+        .record-panels,
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .step-row {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow-circle {
+          margin: 0 auto;
+          transform: rotate(90deg);
+        }
+
+        .step-stats,
+        .stats-band {
+          grid-template-columns: 1fr;
+        }
+
+        .stat-item {
+          border-right: 0;
+          border-bottom: 1px solid #dfe6f0;
+          padding: 18px 0;
+        }
+
+        .stat-item:last-child {
+          border-bottom: 0;
+        }
+
+        .feature-card {
+          grid-template-columns: 1fr;
+        }
+
+        .footer {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+
+        .footer .copyright {
+          justify-self: start;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .container {
+          width: min(100% - 28px, 520px);
+        }
+
+        .site-header {
+          position: relative;
+        }
+
+        .nav {
+          gap: 16px;
+        }
+
+        .nav-actions a:first-child {
+          display: none;
+        }
+
+        .hero-title,
+        .section-title,
+        .cta .section-title {
+          font-size: 38px;
+        }
+
+        .steps .section-title,
+        .features .section-title {
+          font-size: 34px;
+        }
+
+        .eyebrow {
+          margin-bottom: 20px;
+          font-size: 19px;
+        }
+
+        .hero-copy,
+        .section-copy {
+          margin-top: 24px;
+          font-size: 17px;
+        }
+
+        .hero-actions {
+          gap: 14px;
+        }
+
+        .hero-actions .btn {
+          width: 100%;
+        }
+
+        .feature-pills {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+
+        .hero-phones {
+          gap: 18px;
+        }
+
+        .phone {
+          width: 292px;
+          height: 584px;
+        }
+
+        .phone.small {
+          width: 246px;
+          height: 492px;
+        }
+
+        .phone.tiny {
+          width: 210px;
+          height: 420px;
+        }
+
+        .info-card,
+        .rank-card,
+        .side-card,
+        .step-stat {
+          grid-template-columns: 1fr;
+        }
+
+        .record-panels,
+        .why-cards,
+        .feature-grid,
+        .step-stats {
+          gap: 18px;
+        }
+
+        .summary-top,
+        .weekly,
+        .profile-card,
+        .feature-card {
+          padding: 24px;
+        }
+
+        .summary-top strong {
+          font-size: 40px;
+        }
+
+        .summary-stats,
+        .result-stats {
+          gap: 10px;
+        }
+
+        .detail-cta {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        .step-card {
+          min-height: 0;
+          padding: 24px;
+        }
+
+        .cta-grid {
+          gap: 28px;
+        }
+
+        .footer {
+          margin-top: 34px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <nav class="container nav" aria-label="주요 메뉴">
+          <a class="brand" href="#top">Plover</a>
+          <div class="nav-links">
+            <a href="#features">기능</a>
+            <a href="#how">이용 방법</a>
+            <a href="#record">기록</a>
+            <a href="#community">커뮤니티</a>
+          </div>
+          <div class="nav-actions">
+            <a href="#start">로그인</a>
+            <a class="btn btn-primary" href="#start">시작하기</a>
+          </div>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero section-map" aria-labelledby="hero-title">
+          <div class="container hero-grid">
+            <div>
+              <span class="eyebrow">AI 플로깅 도우미</span>
+              <h1 class="hero-title" id="hero-title">플로깅을<br />더 간단하게</h1>
+              <p class="hero-copy">
+                AI 경로 추천부터 기록 관리까지,<br />
+                걷고 줍는 습관을 가볍게 시작해보세요.
+              </p>
+              <div class="hero-actions">
+                <a class="btn btn-primary" href="#start">플로깅 시작하기</a>
+                <a class="btn btn-ghost" href="#features">기능 보기</a>
+              </div>
+              <div class="feature-pills" aria-label="핵심 기능 요약">
+                <div class="feature-pill">
+                  <svg class="icon small" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 18c4 0 3-5 7-5s3-5 7-5" />
+                    <circle cx="4" cy="18" r="2" />
+                    <circle cx="11" cy="13" r="2" />
+                    <circle cx="18" cy="8" r="2" />
+                  </svg>
+                  AI 경로 추천
+                </div>
+                <div class="feature-pill">
+                  <svg class="icon small" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z" />
+                    <circle cx="12" cy="9" r="2.3" />
+                  </svg>
+                  쓰레기/냄새 제보
+                </div>
+                <div class="feature-pill">
+                  <svg class="icon small" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 19h16" />
+                    <path d="M7 16V9" />
+                    <path d="M12 16V5" />
+                    <path d="M17 16v-4" />
+                  </svg>
+                  기록 관리
+                </div>
+              </div>
+            </div>
+
+            <div class="hero-phones" aria-hidden="true">
+              <div class="phone">
+                <div class="phone-screen">
+                  <div class="status"><span>19:02</span><span class="signal"></span></div>
+                  <div class="screen-title center">AI 경로추천</div>
+                  <div class="map-area" style="min-height: 470px">
+                    <span class="map-label blue" style="left: 54px; top: 82px">신천지예수교 중거장막성전</span>
+                    <span class="map-label" style="left: 170px; top: 205px">전남대학교</span>
+                    <span class="map-label" style="left: 190px; top: 352px">전남대역교도서관</span>
+                    <svg class="route-svg" viewBox="0 0 320 470" preserveAspectRatio="none">
+                      <path d="M95 105 C135 120 154 94 176 130 C203 175 190 214 225 246 C190 262 196 307 155 321 C115 335 82 302 72 262 C60 215 74 160 95 105Z" />
+                    </svg>
+                    <span class="pin" style="left: 205px; top: 250px"></span>
+                    <span class="floating-control" style="top: 68px">
+                      <svg class="icon small" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></svg>
+                    </span>
+                    <span class="floating-control" style="top: 122px">
+                      <svg class="icon small" viewBox="0 0 24 24"><path d="M8 21v-7M16 21v-7M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3 21v-5a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v5M14 21v-5a3 3 0 0 1 3-3h1a3 3 0 0 1 3 3v5" /></svg>
+                    </span>
+                    <div class="route-options">
+                      <div class="route-option active">시간 우선 경로<strong>22분</strong><span>1km</span></div>
+                      <div class="route-option">거리 우선 경로<strong>22분</strong><span>1km</span></div>
+                      <div class="route-option">환경 우선 경로<strong>25분</strong><span>1.2km</span></div>
+                    </div>
+                  </div>
+                  <div class="phone-bottom-btn">플로깅 시작하기</div>
+                </div>
+              </div>
+
+              <div class="phone record-phone">
+                <div class="phone-screen">
+                  <div class="status"><span>19:02</span><span class="signal"></span></div>
+                  <span class="floating-control" style="right: 22px; top: 74px">
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" /><path d="m19.4 15 .6 2.2-2.1 1.2-1.7-1a7.8 7.8 0 0 1-2 .8l-.6 1.8h-2.4l-.6-1.8a7.8 7.8 0 0 1-2-.8l-1.7 1-2.1-1.2.6-2.2a8 8 0 0 1-1-1.7L2.5 12l1.9-1.3a8 8 0 0 1 1-1.7l-.6-2.2 2.1-1.2 1.7 1c.6-.3 1.3-.6 2-.8L11.2 4h2.4l.6 1.8c.7.2 1.4.5 2 .8l1.7-1 2.1 1.2-.6 2.2c.4.5.8 1.1 1 1.7l1.9 1.3-1.9 1.3c-.2.6-.6 1.2-1 1.7Z" /></svg>
+                  </span>
+                  <div class="profile-head">
+                    <div class="avatar">
+                      <svg class="icon large" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor" stroke="none" opacity=".45" /><path d="M4 22c1.5-4 4.2-6 8-6s6.5 2 8 6" fill="currentColor" stroke="none" opacity=".35" /></svg>
+                    </div>
+                    <div>
+                      <div class="profile-name">정아현</div>
+                      <span class="level">Lv.7</span>
+                      <span style="margin-left: 10px; font-size: 14px; font-weight: 850">길거리 수호자</span>
+                    </div>
+                    <div></div>
+                    <div class="progress"><span></span></div>
+                  </div>
+                  <div class="mini-stats">
+                    <div><strong>41</strong><span>플로깅</span></div>
+                    <div><strong>20.1</strong><span>총 누적 걸음</span></div>
+                    <div><strong>3.42</strong><span>총 누적 거리</span></div>
+                  </div>
+                  <div class="calendar">
+                    <div class="calendar-head"><span>‹</span><span>2024년 4월</span><span>›</span></div>
+                    <div class="cal-grid">
+                      <span class="dow">월</span><span class="dow">화</span><span class="dow">수</span><span class="dow">목</span><span class="dow">금</span><span class="dow">토</span><span class="dow">일</span>
+                      <span> </span><span> </span><span> </span><span class="dot">1</span><span>2</span><span class="dot">3</span><span class="dot">4</span>
+                      <span>5</span><span>6</span><span>7</span><span class="dot">8</span><span>9</span><span class="dot">10</span><span>11</span>
+                      <span>12</span><span>13</span><span>14</span><span class="dot">15</span><span>16</span><span class="dot">17</span><span>18</span>
+                      <span>19</span><span>20</span><span>21</span><span class="dot">22</span><span>23</span><span>24</span><span>25</span>
+                      <span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span class="empty"></span><span class="empty"></span>
+                    </div>
+                  </div>
+                  <div class="tabbar">
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4" /></svg>
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M4 11 12 5l8 6v9H4Z" /><path d="M10 20v-6h4v6" /></svg>
+                    <svg class="icon small" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" /><path d="M5 21c1.5-4 4-6 7-6s5.5 2 7 6" /></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section why" aria-labelledby="why-title">
+          <div class="container">
+            <div class="why-grid">
+              <div>
+                <span class="eyebrow">왜 Plover인가</span>
+                <h2 class="section-title" id="why-title">걷는 습관이<br />환경 행동이 됩니다</h2>
+                <p class="section-copy">
+                  Plover는 AI가 추천해주는 경로로 플로깅을 시작하고,<br />
+                  쓰레기와 냄새를 지도에 제보하며,<br />
+                  나의 활동을 기록으로 쉽게 관리할 수 있는 앱입니다.
+                </p>
+              </div>
+              <div class="phone small" aria-hidden="true">
+                <div class="phone-screen">
+                  <div class="status"><span>19:02</span><span class="signal"></span></div>
+                  <div class="home-controls">
+                    <div class="chip-row"><span class="chip">자유모드</span><span class="chip">AI 경로추천</span></div>
+                    <span class="floating-control" style="position: static; width: 36px; height: 36px">
+                      <svg class="icon small" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+                    </span>
+                  </div>
+                  <div class="map-area soft" style="position: absolute; inset: 88px 0 86px; border-radius: 0">
+                    <span class="map-label" style="left: 54px; top: 96px">전남대학교</span>
+                    <span class="map-label" style="left: 116px; top: 170px">전남대역교도서관</span>
+                    <span class="pin" style="left: 88px; top: 132px; width: 20px; height: 20px"></span>
+                    <span class="floating-control" style="top: 54px"><svg class="icon small" viewBox="0 0 24 24"><path d="M8 21v-7M16 21v-7M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /></svg></span>
+                  </div>
+                  <span class="camera-btn"><svg class="icon small" viewBox="0 0 24 24"><path d="M4 8h4l2-3h4l2 3h4v11H4Z" /><circle cx="12" cy="13" r="3" /></svg></span>
+                  <span class="home-start">시작</span>
+                  <span class="report-btn">쓰레기 제보</span>
+                  <div class="tabbar">
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4" /></svg>
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M4 11 12 5l8 6v9H4Z" /></svg>
+                    <svg class="icon small" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" /><path d="M5 21c1.5-4 4-6 7-6s5.5 2 7 6" /></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="why-cards">
+              <article class="info-card">
+                <div class="icon-tile">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M4 18c4 0 3-5 7-5s3-5 7-5" /><circle cx="4" cy="18" r="2" /><circle cx="11" cy="13" r="2" /><circle cx="18" cy="8" r="2" /></svg>
+                </div>
+                <div>
+                  <h3>AI 경로 추천</h3>
+                  <p>시간과 거리에 맞춰 최적의 플로깅 경로를 추천해 드립니다.</p>
+                </div>
+              </article>
+              <article class="info-card">
+                <div class="icon-tile">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z" /><circle cx="12" cy="9" r="2.3" /></svg>
+                </div>
+                <div>
+                  <h3>쓰레기/냄새 제보</h3>
+                  <p>쓰레기나 냄새 문제를 지도에 제보하고, 우리 동네를 함께 지켜요.</p>
+                </div>
+              </article>
+              <article class="info-card">
+                <div class="icon-tile">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M4 19h16" /><path d="M7 16V9" /><path d="M12 16V5" /><path d="M17 16v-4" /></svg>
+                </div>
+                <div>
+                  <h3>기록 관리</h3>
+                  <p>거리, 시간, 플로깅 횟수까지 한눈에 확인하고 꾸준히 관리해 보세요.</p>
+                </div>
+              </article>
+            </div>
+
+            <div class="stats-band" aria-label="전체 플로깅 지표">
+              <div class="stat-item">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z" /><circle cx="12" cy="9" r="2.3" /><path d="M8 22h8" /></svg>
+                <div><strong>8.2 <em>km</em></strong><span>총 플로깅 거리</span></div>
+              </div>
+              <div class="stat-item">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" /><path d="M12 13V8M12 2v3M9 2h6" /></svg>
+                <div><strong>1:41</strong><span>총 플로깅 시간</span></div>
+              </div>
+              <div class="stat-item">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M5 21V4" /><path d="M5 5h12l-2 4 2 4H5" /></svg>
+                <div><strong>41 <em>회</em></strong><span>총 플로깅 횟수</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section record" id="record" aria-labelledby="record-title">
+          <div class="container record-grid">
+            <div>
+              <span class="eyebrow">기록</span>
+              <h2 class="section-title" id="record-title">내 기록을<br />한눈에 확인하세요</h2>
+              <p class="section-copy">
+                걸음 수, 이동 거리, 활동 시간은 물론<br />
+                캘린더로 확인하는 꾸준한 기록까지,<br />
+                내가 걸어온 모든 순간을 한눈에 확인할 수 있어요.
+              </p>
+              <ul class="feature-list">
+                <li>
+                  <span class="icon-tile" style="width:58px;height:58px;border-radius:12px"><svg class="icon small" viewBox="0 0 24 24"><path d="M13 3 6 13h5l-1 8 7-11h-5l1-7Z" /></svg></span>
+                  걸음 수, 거리, 시간 등 활동 기록을 요약
+                </li>
+                <li>
+                  <span class="icon-tile" style="width:58px;height:58px;border-radius:12px"><svg class="icon small" viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M4 9h16M5 5h14v16H5Z" /></svg></span>
+                  캘린더로 확인하는 월별 활동 이력
+                </li>
+                <li>
+                  <span class="icon-tile" style="width:58px;height:58px;border-radius:12px"><svg class="icon small" viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4" /></svg></span>
+                  꾸준함을 확인하고, 더 나은 나를 만들어가세요
+                </li>
+              </ul>
+            </div>
+
+            <div class="record-panels" aria-hidden="true">
+              <div class="record-left">
+                <div class="summary-card">
+                  <div class="summary-top">
+                    <span>4월의 누적</span>
+                    <strong>20,041</strong> <em>걸음</em>
+                    <div class="summary-line"></div>
+                    <div class="summary-stats">
+                      <div><strong>80 <em>분</em></strong><small>총 활동 시간</small></div>
+                      <div><strong>20.3 <em>km</em></strong><small>총 거리</small></div>
+                      <div><strong>5 <em>회</em></strong><small>총 플로깅</small></div>
+                    </div>
+                  </div>
+                  <div class="weekly">
+                    <h3>주간 기록</h3>
+                    <div class="bars">
+                      <div class="bar-wrap"><div class="bar" style="height:80px"></div><span>월</span></div>
+                      <div class="bar-wrap"><div class="bar" style="height:96px"></div><span>화</span></div>
+                      <div class="bar-wrap"><div class="bar gray" style="height:12px"></div><span>수</span></div>
+                      <div class="bar-wrap"><div class="bar active" style="height:122px"></div><span>목</span></div>
+                      <div class="bar-wrap"><div class="bar" style="height:80px"></div><span>금</span></div>
+                      <div class="bar-wrap"><div class="bar gray" style="height:12px"></div><span>토</span></div>
+                      <div class="bar-wrap"><div class="bar" style="height:34px"></div><span>일</span></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="rank-card">
+                  <div class="circle-icon">
+                    <svg class="icon large" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" /><path d="M7 7H4a3 3 0 0 0 3 3M17 7h3a3 3 0 0 1-3 3" /></svg>
+                  </div>
+                  <div>
+                    <p>우리 동네 랭킹</p>
+                    <strong>상위 12%</strong>
+                    <p>상위 12%의 플로버예요!</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="profile-card">
+                  <div class="profile-head" style="margin-top:0">
+                    <div class="avatar">
+                      <svg class="icon large" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor" stroke="none" opacity=".45" /><path d="M4 22c1.5-4 4.2-6 8-6s6.5 2 8 6" fill="currentColor" stroke="none" opacity=".35" /></svg>
+                    </div>
+                    <div>
+                      <div class="profile-name">정아현</div>
+                      <span class="level">Lv.7</span>
+                      <span style="margin-left: 10px; font-size: 14px; font-weight: 850">길거리 수호자</span>
+                    </div>
+                    <svg class="icon small" viewBox="0 0 24 24"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" /><path d="M19.4 15 21 16l-2 3-2-1a8 8 0 0 1-3 1l-.8 2h-3L9 19a8 8 0 0 1-3-1l-2 1-2-3 1.6-1a8 8 0 0 1 0-6L2 8l2-3 2 1a8 8 0 0 1 3-1l1-2h3l1 2a8 8 0 0 1 3 1l2-1 2 3-1.6 1a8 8 0 0 1 0 6Z" /></svg>
+                    <div class="progress"><span></span></div>
+                  </div>
+                  <div class="calendar">
+                    <div class="calendar-head"><span>‹</span><span>4월</span><span>›</span></div>
+                    <div class="cal-grid">
+                      <span class="dow">일</span><span class="dow">화</span><span class="dow">수</span><span class="dow">목</span><span class="dow">금</span><span class="dow">토</span><span class="dow"></span>
+                      <span> </span><span> </span><span> </span><span class="dot">1</span><span class="dot">2</span><span class="dot">3</span><span> </span>
+                      <span>5</span><span>6</span><span>7</span><span class="dot">8</span><span>9</span><span class="dot">10</span><span> </span>
+                      <span>12</span><span>13</span><span>14</span><span class="dot">15</span><span>16</span><span class="dot">17</span><span> </span>
+                      <span>19</span><span>20</span><span>21</span><span class="dot">22</span><span>23</span><span>25</span><span> </span>
+                      <span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span class="empty"></span><span class="empty"></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-cta">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4" /></svg>
+                  <a class="btn btn-ghost" href="#record">기록 자세히 보기</a>
+                  <svg class="icon small" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section steps" id="how" aria-labelledby="how-title">
+          <div class="container">
+            <span class="eyebrow">이용 방법</span>
+            <h2 class="section-title" id="how-title">3단계로 바로 시작하세요</h2>
+            <div class="step-row">
+              <article class="step-card">
+                <div class="step-head"><span class="number">1</span>경로 선택</div>
+                <div class="phone tiny" aria-hidden="true">
+                  <div class="phone-screen">
+                    <div class="status"><span>19:02</span><span class="signal"></span></div>
+                    <div class="screen-title center" style="font-size:13px">AI 경로추천</div>
+                    <div class="map-area" style="min-height: 292px">
+                      <span class="map-label blue" style="left: 38px; top: 74px; font-size: 9px">신천지예수교 중거장막성전</span>
+                      <svg class="route-svg" viewBox="0 0 224 292" preserveAspectRatio="none">
+                        <path d="M72 74 C104 92 111 66 140 88 C166 108 150 138 169 157 C139 179 154 213 112 219 C82 224 58 196 57 162 C56 126 62 95 72 74Z" />
+                      </svg>
+                      <span class="pin" style="left: 138px; top: 150px; width: 24px; height: 24px"></span>
+                    </div>
+                    <div class="route-options" style="left:12px;right:12px;bottom:60px;gap:5px">
+                      <div class="route-option active" style="min-height:54px;padding:8px;font-size:8px"><strong style="font-size:14px">22분</strong><span>1km</span></div>
+                      <div class="route-option" style="min-height:54px;padding:8px;font-size:8px"><strong style="font-size:14px">22분</strong><span>1km</span></div>
+                      <div class="route-option" style="min-height:54px;padding:8px;font-size:8px"><strong style="font-size:14px">25분</strong><span>1.2km</span></div>
+                    </div>
+                    <div class="phone-bottom-btn" style="height:42px;left:12px;right:12px;bottom:12px;font-size:11px">플로깅 시작하기</div>
+                  </div>
+                </div>
+                <p>시간 또는 거리 기준으로<br />나에게 맞는 경로를 선택하세요.</p>
+              </article>
+
+              <div class="arrow-circle" aria-hidden="true">
+                <svg class="icon small" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </div>
+
+              <article class="step-card">
+                <div class="step-head"><span class="number">2</span>플로깅 진행</div>
+                <div class="phone tiny" aria-hidden="true">
+                  <div class="phone-screen">
+                    <div class="status"><span>19:02</span><span class="signal"></span></div>
+                    <div class="live-panel">
+                      <strong>14 : 17</strong>
+                      <div class="live-metrics"><div><b>8.2</b><span>km</span></div><div><b>34,500</b><span>걸음</span></div><div><b>2,580</b><span>kcal</span></div></div>
+                    </div>
+                    <div class="map-area soft" style="position:absolute;inset:64px 0 0;border-radius:0">
+                      <span class="map-label" style="left:84px;top:116px;font-size:10px">전남대학교</span>
+                      <span class="pin" style="left:112px;top:190px;width:32px;height:32px"></span>
+                      <span class="floating-control" style="top:78px;right:12px;width:32px;height:32px"><svg class="icon small" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg></span>
+                    </div>
+                    <span class="floating-badge">정</span>
+                    <div class="bottom-action-row">
+                      <span class="pill-btn"><svg class="icon small" viewBox="0 0 24 24"><path d="M4 8h4l2-3h4l2 3h4v11H4Z" /><circle cx="12" cy="13" r="3" /></svg></span>
+                      <span class="pill-btn">일시 정지</span>
+                      <span class="pill-btn end">종료</span>
+                    </div>
+                  </div>
+                </div>
+                <p>쓰레기를 주우며 걷고,<br />진행 상황을 실시간으로 확인하세요.</p>
+              </article>
+
+              <div class="arrow-circle" aria-hidden="true">
+                <svg class="icon small" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+              </div>
+
+              <article class="step-card">
+                <div class="step-head"><span class="number">3</span>기록 확인</div>
+                <div class="phone tiny result-phone" aria-hidden="true">
+                  <div class="phone-screen">
+                    <div class="status"><span>19:02</span><span class="signal"></span></div>
+                    <div class="result-title">4월 24일 플로깅</div>
+                    <div class="result-card">
+                      <span style="color:#8a95a5;font-size:10px;font-weight:900">DISTANCE</span>
+                      <div class="result-number"><strong>8.2</strong><span>km</span></div>
+                      <div class="map-area">
+                        <svg class="route-svg" viewBox="0 0 200 150" preserveAspectRatio="none">
+                          <path d="M52 44 C85 54 96 34 126 58 C151 80 134 103 160 115 C124 136 92 128 68 108 C49 91 43 67 52 44Z" />
+                        </svg>
+                        <span class="pin" style="left:126px;top:90px;width:22px;height:22px"></span>
+                      </div>
+                    </div>
+                    <div class="result-stats"><div><span>걸음 수</span><strong>17,000</strong></div><div><span>소요 시간</span><strong>1:41</strong></div><div><span>소모 칼로리</span><strong>428</strong></div></div>
+                    <div class="phone-bottom-btn" style="height:42px;left:16px;right:16px;bottom:16px;font-size:11px">플로깅 완료</div>
+                  </div>
+                </div>
+                <p>결과를 저장하고<br />SNS로 공유해 보세요.</p>
+              </article>
+            </div>
+
+            <div class="step-stats">
+              <div class="step-stat">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6" /></svg>
+                <div><span>수거한 쓰레기</span><strong>17,000개</strong></div>
+              </div>
+              <div class="step-stat">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg>
+                <div><span>소요 시간</span><strong>1:41</strong></div>
+              </div>
+              <div class="step-stat">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 22c4-3 7-6 7-10a7 7 0 0 0-3-6c0 4-3 5-3 5s1-5-4-9c0 5-4 7-4 11a7 7 0 0 0 7 9Z" /></svg>
+                <div><span>소모 칼로리</span><strong>428kcal</strong></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section features" id="features" aria-labelledby="features-title">
+          <div class="container">
+            <span class="eyebrow">핵심 기능</span>
+            <h2 class="section-title" id="features-title">필요한 기능만 깔끔하게</h2>
+            <div class="feature-grid">
+              <article class="feature-card">
+                <div>
+                  <span class="number">1</span>
+                  <svg class="icon large" viewBox="0 0 24 24" style="margin-left:18px"><path d="M4 18c4 0 3-5 7-5s3-5 7-5" /><circle cx="4" cy="18" r="2" /><circle cx="11" cy="13" r="2" /><circle cx="18" cy="8" r="2" /></svg>
+                  <h3>AI 경로 추천</h3>
+                  <p>지역 데이터를 기반으로 최적의 플로깅 경로를 추천해요.</p>
+                  <ul>
+                    <li>이동 시간, 거리, 쓰레기 자주 발생 지역을 분석</li>
+                    <li>안전하고 효율적인 경로 제안</li>
+                  </ul>
+                </div>
+                <div class="mini-map-card" aria-hidden="true">
+                  <div class="phone-screen">
+                    <div class="screen-title center">AI 경로추천</div>
+                    <div class="map-area">
+                      <svg class="route-svg" viewBox="0 0 292 200" preserveAspectRatio="none">
+                        <path d="M88 40 C126 64 144 28 180 64 C214 100 180 134 220 150 C166 178 114 166 88 128 C70 100 72 66 88 40Z" />
+                      </svg>
+                      <span class="pin" style="left:182px;top:120px;width:30px;height:30px"></span>
+                    </div>
+                    <div class="route-options" style="position:relative;left:auto;right:auto;bottom:auto;margin:10px;gap:6px">
+                      <div class="route-option active" style="min-height:54px;padding:8px;font-size:9px"><strong style="font-size:14px">22분</strong><span>1km</span></div>
+                      <div class="route-option" style="min-height:54px;padding:8px;font-size:9px"><strong style="font-size:14px">22분</strong><span>1km</span></div>
+                      <div class="route-option" style="min-height:54px;padding:8px;font-size:9px"><strong style="font-size:14px">25분</strong><span>1.2km</span></div>
+                    </div>
+                    <div class="mini-card-fade"></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="feature-card">
+                <div>
+                  <span class="number">2</span>
+                  <svg class="icon large" viewBox="0 0 24 24" style="margin-left:18px"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6" /></svg>
+                  <h3>쓰레기/냄새 제보</h3>
+                  <p>쓰레기나 악취가 나는 장소를 간편하게 제보할 수 있어요.</p>
+                  <ul>
+                    <li>지도에서 위치를 선택하고 바로 제보</li>
+                    <li>다른 사용자와 정보를 공유</li>
+                  </ul>
+                </div>
+                <div class="mini-map-card" aria-hidden="true">
+                  <div class="phone-screen">
+                    <div class="map-area" style="min-height:292px">
+                      <span class="map-label" style="left:62px;top:76px">전남대학교</span>
+                      <span class="pin" style="left:128px;top:120px"></span>
+                      <span class="floating-badge" style="right:20px;bottom:112px">정</span>
+                      <span class="camera-btn" style="left:18px;bottom:28px"><svg class="icon small" viewBox="0 0 24 24"><path d="M4 8h4l2-3h4l2 3h4v11H4Z" /><circle cx="12" cy="13" r="3" /></svg></span>
+                      <span class="pill-btn" style="position:absolute;left:70px;right:28px;bottom:28px">일시 정지</span>
+                    </div>
+                    <div class="mini-card-fade"></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="feature-card">
+                <div>
+                  <span class="number">3</span>
+                  <svg class="icon large" viewBox="0 0 24 24" style="margin-left:18px"><circle cx="12" cy="12" r="9" /><path d="M12 7v6l4 2" /></svg>
+                  <h3>5분 단위 경로 설정</h3>
+                  <p>원하는 시간에 맞춰 간편하게 플로깅을 시작할 수 있어요.</p>
+                </div>
+                <div class="setting-card" aria-hidden="true">
+                  <div class="setting-title">플로깅 설정</div>
+                  <div class="setting-row"><span>시간</span><strong>5분</strong><span class="spinner"><i class="tri up"></i><i class="tri down"></i></span></div>
+                  <span class="btn btn-primary">시작</span>
+                </div>
+              </article>
+
+              <article class="feature-card">
+                <div>
+                  <span class="number">4</span>
+                  <svg class="icon large" viewBox="0 0 24 24" style="margin-left:18px"><path d="M5 19c8 1 14-5 14-14-8 0-14 6-14 14Z" /><path d="M5 19c3-5 7-8 14-14" /></svg>
+                  <h3>환경 기여도 예상</h3>
+                  <p>플로깅 후 예상되는 환경 기여도를 한눈에 확인할 수 있어요.</p>
+                </div>
+                <div class="impact-card" aria-hidden="true">
+                  <h4>예상 CO<sub>2</sub> 절감량</h4>
+                  <div class="impact-amount">
+                    <span class="icon-tile" style="width:56px;height:56px;border-radius:12px"><svg class="icon small" viewBox="0 0 24 24"><path d="M5 19c8 1 14-5 14-14-8 0-14 6-14 14Z" /><path d="M5 19c3-5 7-8 14-14" /></svg></span>
+                    <strong>2.58<small>kg</small></strong>
+                  </div>
+                  <p>이번 플로깅으로 지구를 이만큼 더 깨끗하게 만들었어요.</p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section cta" id="start" aria-labelledby="start-title">
+          <div class="container">
+            <div class="cta-grid">
+              <div>
+                <span class="eyebrow">함께 시작해보세요</span>
+                <h2 class="section-title" id="start-title">오늘의 걸음이<br />내일의 환경을 바꿉니다</h2>
+                <p class="section-copy">Plover와 함께 플로깅을 시작하고<br />더 깨끗한 환경을 만들어가세요.</p>
+                <div class="hero-actions">
+                  <a class="btn btn-primary" href="#top">플로깅 시작하기</a>
+                  <a class="btn btn-ghost" href="#community">문의하기</a>
+                </div>
+              </div>
+
+              <div class="phone small result-phone" aria-hidden="true">
+                <div class="phone-screen">
+                  <div class="status"><span>19:02</span><span class="signal"></span></div>
+                  <div class="result-title">4월 24일 플로깅</div>
+                  <div class="result-card">
+                    <span style="color:#8a95a5;font-size:10px;font-weight:900">DISTANCE</span>
+                    <div class="result-number"><strong>8.2</strong><span>km</span></div>
+                    <div class="map-area">
+                      <svg class="route-svg" viewBox="0 0 230 150" preserveAspectRatio="none">
+                        <path d="M58 42 C95 56 104 30 140 58 C168 81 150 108 182 118 C142 142 100 132 74 108 C54 90 47 66 58 42Z" />
+                      </svg>
+                      <span class="pin" style="left:150px;top:94px;width:24px;height:24px"></span>
+                    </div>
+                  </div>
+                  <div class="result-stats"><div><span>걸음 수</span><strong>17,000</strong></div><div><span>플로깅 시간</span><strong>1:41</strong></div><div><span>정지</span><strong>0:30</strong></div></div>
+                  <div class="thumb-row"><span class="thumb"></span><span class="thumb"></span><span class="thumb"></span><span class="thumb"></span></div>
+                  <div class="phone-bottom-btn">플로깅 완료</div>
+                </div>
+              </div>
+
+              <div class="cta-cards" id="community">
+                <article class="side-card">
+                  <div class="circle-icon"><svg class="icon large" viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z" /><circle cx="12" cy="9" r="2.3" /></svg></div>
+                  <div><h3>AI 경로 추천</h3><p>내 주변을 분석해 최적의 플로깅 경로를 추천해요.</p></div>
+                </article>
+                <article class="side-card">
+                  <div class="circle-icon"><svg class="icon large" viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4" /></svg></div>
+                  <div><h3>기록 관리</h3><p>걸음 수, 시간, 수거 내역까지 모든 활동을 자동으로 기록해요.</p></div>
+                </article>
+                <article class="side-card">
+                  <div class="circle-icon"><svg class="icon large" viewBox="0 0 24 24"><path d="M5 19c8 1 14-5 14-14-8 0-14 6-14 14Z" /><path d="M5 19c3-5 7-8 14-14" /></svg></div>
+                  <div><h3>환경 기여 확인</h3><p>내가 만든 변화와 환경 기여도를 확인할 수 있어요.</p></div>
+                </article>
+              </div>
+            </div>
+
+            <footer class="footer" id="privacy">
+              <a class="brand" href="#top">Plover</a>
+              <a href="#features">서비스 소개</a>
+              <a href="#privacy">개인정보처리방침</a>
+              <a href="#community">문의</a>
+              <span class="copyright">&copy; Plover. All rights reserved.</span>
+            </footer>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

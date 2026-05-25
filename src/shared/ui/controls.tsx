@@ -1,10 +1,12 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import type { ComponentProps } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
   View,
+  type ImageStyle,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -14,8 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, shadows } from "../theme";
 
 type FeatherName = ComponentProps<typeof Feather>["name"];
-type MapControlIconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+type MapControlIconSource = ComponentProps<typeof Image>["source"];
 export type PloggingMode = "free" | "ai";
+
+const mapControlIcons = {
+  heatmap: require("@/assets/icons/map-control-heatmap.svg"),
+  restroom: require("@/assets/icons/map-control-restroom.svg"),
+} as const;
 
 export function IconCircleButton({
   name,
@@ -100,17 +107,17 @@ export function MapControls({
           accessibilityState={{ selected: heatmapActive }}
           active={heatmapActive}
           label={heatmapActive ? "히트맵 숨기기" : "히트맵 표시"}
-          name="weather-sunny"
+          source={mapControlIcons.heatmap}
           onPress={onToggleHeatmap}
         />
       ) : (
-        <MapControlButton label="날씨" name="weather-sunny" />
+        <MapControlButton label="날씨" source={mapControlIcons.heatmap} />
       )}
       <MapControlButton
         accessibilityState={{ selected: restroomActive }}
         active={restroomActive}
         label={restroomActive ? "화장실 숨기기" : "화장실 표시"}
-        name="toilet"
+        source={mapControlIcons.restroom}
         onPress={onToggleRestroom}
       />
     </View>
@@ -122,14 +129,14 @@ function MapControlButton({
   active = false,
   iconSize = 24,
   label,
-  name,
+  source,
   onPress,
 }: {
   accessibilityState?: ComponentProps<typeof Pressable>["accessibilityState"];
   active?: boolean;
   iconSize?: number;
   label: string;
-  name: MapControlIconName;
+  source: MapControlIconSource;
   onPress?: () => void;
 }) {
   return (
@@ -145,10 +152,11 @@ function MapControlButton({
         pressed ? styles.pressed : null,
       ]}
     >
-      <MaterialCommunityIcons
-        color={active ? colors.surface : colors.icon}
-        name={name}
-        size={iconSize}
+      <Image
+        contentFit="contain"
+        source={source}
+        style={[styles.mapControlIcon, { height: iconSize, width: iconSize }]}
+        tintColor={active ? colors.surface : null}
       />
     </Pressable>
   );
@@ -244,7 +252,10 @@ function ModeOption({
         pressed ? styles.pressed : null,
       ]}
     >
-      <Text selectable style={styles.modeText}>
+      <Text
+        selectable
+        style={[styles.modeText, selected ? styles.modeTextActive : null]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -256,6 +267,7 @@ const styles = StyleSheet.create<{
   backButton: ViewStyle;
   figmaIconCircle: ViewStyle;
   figmaIconCircleActive: ViewStyle;
+  mapControlIcon: ImageStyle;
   pressed: ViewStyle;
   mapControls: ViewStyle;
   primaryBottomButton: ViewStyle;
@@ -265,6 +277,7 @@ const styles = StyleSheet.create<{
   modeOption: ViewStyle;
   modeOptionActive: ViewStyle;
   modeText: TextStyle;
+  modeTextActive: TextStyle;
 }>({
   iconCircle: {
     alignItems: "center",
@@ -283,6 +296,10 @@ const styles = StyleSheet.create<{
   },
   figmaIconCircleActive: {
     backgroundColor: "#0A0A0A",
+  },
+  mapControlIcon: {
+    height: 24,
+    width: 24,
   },
   backButton: {
     alignItems: "center",
@@ -341,12 +358,15 @@ const styles = StyleSheet.create<{
     paddingHorizontal: 23,
   },
   modeOptionActive: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primary,
     ...shadows.soft,
   },
   modeText: {
     color: colors.text,
     fontSize: 16,
     letterSpacing: 0,
+  },
+  modeTextActive: {
+    color: colors.surface,
   },
 });
