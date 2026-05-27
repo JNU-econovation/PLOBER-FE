@@ -12,7 +12,7 @@ import { useAuthSession } from "../hooks/use-auth-session";
 import { isAppleLoginCanceled } from "../services/apple-auth";
 import { isKakaoLoginCanceled } from "../services/kakao-auth";
 
-const appIconSource = require("@/assets/icons/appIcon.svg");
+const appIconSource = require("@/assets/icons/appIcon-native.png");
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();

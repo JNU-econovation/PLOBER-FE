@@ -10,6 +10,7 @@ import {
   stopPloggingBackgroundLocation,
 } from "../services/plogging-background-location";
 import {
+  isBackgroundPloggingSnapshotForSession,
   readBackgroundPloggingSnapshot,
   setBackgroundPloggingStepCount,
   subscribeBackgroundPloggingSnapshot,
@@ -43,8 +44,14 @@ export function usePloggingTracker({
   isPaused,
   startedAtMs,
 }: UsePloggingTrackerOptions): PloggingTrackerState {
-  const { addSteps, appendRoutePoint, appendRoutePoints, setPlaceName, stepCount } =
-    usePloggingSession();
+  const {
+    addSteps,
+    appendRoutePoint,
+    appendRoutePoints,
+    setPlaceName,
+    stepCount,
+  } = usePloggingSession();
+  const backgroundSessionId = String(startedAtMs);
 
   const [locationPermission, setLocationPermission] =
     useState<PermissionStatus>("idle");
@@ -69,6 +76,16 @@ export function usePloggingTracker({
 
   const applyBackgroundSnapshot = useCallback(
     (snapshot: BackgroundPloggingSnapshot) => {
+      if (
+        !isBackgroundPloggingSnapshotForSession(
+          snapshot,
+          backgroundSessionId
+        )
+      ) {
+        appliedBackgroundRouteCountRef.current = 0;
+        return;
+      }
+
       if (snapshot.routePoints.length < appliedBackgroundRouteCountRef.current) {
         appliedBackgroundRouteCountRef.current = 0;
       }
@@ -92,7 +109,7 @@ export function usePloggingTracker({
         }
       }
     },
-    [appendRoutePoints, setPlaceName]
+    [appendRoutePoints, backgroundSessionId, setPlaceName]
   );
 
   useEffect(() => {

@@ -8,5 +8,13 @@ export async function getUserProfile(userId: number): Promise<UserProfile> {
   const response = await apiClient.get<UserProfile>(MY_PROFILE_PATH, {
     params: { userId },
   });
+
+  if (__DEV__) {
+    console.log(
+      "[api/users/me] data",
+      JSON.stringify(response.data, null, 2)
+    );
+  }
+
   return response.data;
 }

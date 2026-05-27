@@ -163,10 +163,14 @@ function MapControlButton({
 }
 
 export function PrimaryBottomButton({
+  accessibilityLabel,
+  disabled = false,
   title,
   onPress,
   style,
 }: {
+  accessibilityLabel?: string;
+  disabled?: boolean;
   title: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
@@ -178,8 +182,10 @@ export function PrimaryBottomButton({
 
   return (
     <Pressable
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       hitSlop={{ top: 8 }}
       onPress={onPress}
       style={({ pressed }) => [
@@ -188,7 +194,8 @@ export function PrimaryBottomButton({
           paddingTop: visualPadding,
           paddingBottom: visualPadding + insets.bottom,
         },
-        pressed ? styles.primaryPressed : null,
+        pressed && !disabled ? styles.primaryPressed : null,
+        disabled ? styles.primaryDisabled : null,
         style,
       ]}
     >
@@ -271,6 +278,7 @@ const styles = StyleSheet.create<{
   pressed: ViewStyle;
   mapControls: ViewStyle;
   primaryBottomButton: ViewStyle;
+  primaryDisabled: ViewStyle;
   primaryPressed: ViewStyle;
   primaryBottomText: TextStyle;
   modeSwitch: ViewStyle;
@@ -329,6 +337,9 @@ const styles = StyleSheet.create<{
     position: "absolute",
     right: 0,
     ...shadows.button,
+  },
+  primaryDisabled: {
+    backgroundColor: colors.subtle,
   },
   primaryPressed: {
     backgroundColor: colors.primaryDark,

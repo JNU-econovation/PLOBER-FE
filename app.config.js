@@ -25,7 +25,8 @@ export default ({ config }) => ({
       NSLocationAlwaysUsageDescription: "화면을 끄거나 다른 앱을 사용해도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
       NSLocationWhenInUseUsageDescription: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
       NSMotionUsageDescription: "플로깅 중 걸음 수를 측정하기 위해 동작 인식 권한이 필요합니다.",
-      NSPhotoLibraryUsageDescription: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
+      NSPhotoLibraryUsageDescription: "프로필 이미지 선택 및 플로깅 리포트 이미지 저장을 위해 사진 접근 권한이 필요합니다.",
+      NSPhotoLibraryAddUsageDescription: "플로깅 리포트 이미지를 사진 앱에 저장하기 위해 권한이 필요합니다.",
       NSCameraUsageDescription: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
       NSSupportsLiveActivities: true,
       UIBackgroundModes: ["location"],
@@ -78,7 +79,7 @@ export default ({ config }) => ({
   
   web: {
     output: "static",
-    favicon: "./assets/icons/appIcon.svg",
+    favicon: "./assets/icons/appIcon-native.png",
   },
   
   plugins: [
@@ -100,9 +101,17 @@ export default ({ config }) => ({
     [
       "expo-image-picker",
       {
-        photosPermission: "프로필 이미지 선택을 위해 사진 접근 권한이 필요합니다.",
+        photosPermission: "프로필 이미지 선택 및 플로깅 리포트 이미지 저장을 위해 사진 접근 권한이 필요합니다.",
         cameraPermission: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
         microphonePermission: false,
+      },
+    ],
+    [
+      "expo-media-library",
+      {
+        photosPermission: "프로필 이미지 선택 및 플로깅 리포트 이미지 저장을 위해 사진 접근 권한이 필요합니다.",
+        savePhotosPermission: "플로깅 리포트 이미지를 사진 앱에 저장하기 위해 권한이 필요합니다.",
+        isAccessMediaLocationEnabled: false,
       },
     ],
     [

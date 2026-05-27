@@ -33,7 +33,7 @@ function RootStack() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="ai-route" />
       <Stack.Screen name="plogging" />
-      <Stack.Screen name="report" />
+      <Stack.Screen name="report" options={{ gestureEnabled: false }} />
       <Stack.Screen name="Map" />
       <Stack.Screen name="plogging-sessions/[id]" />
     </Stack>

@@ -307,13 +307,30 @@ function FacilityMarker({
       style={styles.facilityMarker}
     >
       <View style={[styles.facilityMarkerBubble, { backgroundColor: color }]}>
-        <MaterialCommunityIcons
-          color={colors.surface}
-          name={iconName}
-          size={FACILITY_MARKER_ICON_SIZE}
-        />
+        {iconName === "trash-can" ? (
+          <TrashCanFacilityIcon cutoutColor={color} />
+        ) : (
+          <MaterialCommunityIcons
+            color={colors.surface}
+            name={iconName}
+            size={FACILITY_MARKER_ICON_SIZE}
+          />
+        )}
       </View>
       <View style={[styles.facilityMarkerTail, { borderTopColor: color }]} />
+    </View>
+  );
+}
+
+function TrashCanFacilityIcon({ cutoutColor }: { cutoutColor: string }) {
+  return (
+    <View style={styles.trashCanIcon}>
+      <View style={styles.trashCanHandle} />
+      <View style={styles.trashCanLid} />
+      <View style={styles.trashCanBody}>
+        <View style={[styles.trashCanRib, { backgroundColor: cutoutColor }]} />
+        <View style={[styles.trashCanRib, { backgroundColor: cutoutColor }]} />
+      </View>
     </View>
   );
 }
@@ -400,6 +417,47 @@ const styles = StyleSheet.create({
     height: 0,
     marginTop: -2,
     width: 0,
+  },
+  trashCanBody: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    flexDirection: "row",
+    gap: 2,
+    height: 12,
+    justifyContent: "center",
+    marginTop: 1,
+    paddingTop: 2,
+    width: 14,
+  },
+  trashCanHandle: {
+    borderColor: colors.surface,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    borderTopWidth: 2,
+    height: 4,
+    marginBottom: -1,
+    width: 8,
+  },
+  trashCanIcon: {
+    alignItems: "center",
+    height: FACILITY_MARKER_ICON_SIZE,
+    justifyContent: "flex-start",
+    width: FACILITY_MARKER_ICON_SIZE,
+  },
+  trashCanLid: {
+    backgroundColor: colors.surface,
+    borderRadius: 2,
+    height: 3,
+    width: 17,
+  },
+  trashCanRib: {
+    borderRadius: 1,
+    height: 7,
+    width: 2,
   },
   routeArrowHead: {
     borderBottomColor: colors.surface,
