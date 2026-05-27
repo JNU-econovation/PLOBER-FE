@@ -626,7 +626,8 @@ function ProfileOverview({
   uploadingProfileImage: boolean;
 }) {
   const experienceProgressPercent = getExperienceProgressPercent(
-    profile.experience
+    profile.experience,
+    profile.level
   );
   const experienceProgressWidth = `${experienceProgressPercent}%` as const;
 
@@ -729,10 +730,14 @@ function formatTenThousandSteps(stepCount: number) {
   return formatCompactNumber(tenThousandSteps);
 }
 
-function getExperienceProgressPercent(experience: number) {
-  if (!Number.isFinite(experience)) return 0;
+function getExperienceProgressPercent(experience: number, level: number) {
+  if (!Number.isFinite(experience) || !Number.isFinite(level)) return 0;
 
-  const progressPercent = (experience / EXPERIENCE_PROGRESS_UNIT) * 100;
+  const completedLevelExperience =
+    Math.max(Math.floor(level) - 1, 0) * EXPERIENCE_PROGRESS_UNIT;
+  const currentLevelExperience = experience - completedLevelExperience;
+  const progressPercent =
+    (currentLevelExperience / EXPERIENCE_PROGRESS_UNIT) * 100;
 
   return Math.max(0, Math.min(progressPercent, 100));
 }

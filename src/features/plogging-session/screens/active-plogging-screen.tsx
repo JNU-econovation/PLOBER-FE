@@ -30,6 +30,10 @@ import { analyzeTrashPhoto } from "../services/analyze-trash-photo";
 import { capturePloggingPhoto } from "../services/capture-plogging-photo";
 import { stopPloggingBackgroundLocation } from "../services/plogging-background-location";
 import {
+  isBackgroundPloggingSnapshotForSession,
+  readBackgroundPloggingSnapshot,
+} from "../services/plogging-background-store";
+import {
   endPloggingLiveActivity,
   startPloggingLiveActivity,
   updatePloggingLiveActivity,
@@ -38,6 +42,7 @@ import {
 import { uploadPloggingPhoto } from "../services/upload-plogging-photo";
 
 type LiveStat = { label: string; unit: string; value: string };
+type RouteLikePoint = { latitude: number; longitude: number };
 
 const HEATMAP_LEGEND_TOP_OFFSET = 168;
 const TIMER_CARD_ACTIVE_TOP_OFFSET = 18;
@@ -45,6 +50,7 @@ const TIMER_CARD_PAUSED_CONTENT_HEIGHT = 150;
 const MAP_CONTROLS_ACTIVE_TOP_OFFSET = 167;
 const MAP_CONTROLS_CARD_GAP = 18;
 const LIVE_ACTIVITY_UPDATE_INTERVAL_MS = 5_000;
+const SNAPSHOT_ROUTE_POINT_MATCH_THRESHOLD_METERS = 2.5;
 
 export function ActivePloggingScreen() {
   const router = useRouter();
@@ -57,8 +63,10 @@ export function ActivePloggingScreen() {
   const liveActivityStartedRef = useRef(false);
   const lastLiveActivityPausedRef = useRef(timer.isPaused);
   const lastLiveActivityUpdateAtRef = useRef(0);
+  const endingRef = useRef(false);
   const { position } = useDeviceLocation();
   const [heatmapVisible, setHeatmapVisible] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const safeTop = Math.max(insets.top, 44);
   const pausedTimerCardHeight = safeTop + TIMER_CARD_PAUSED_CONTENT_HEIGHT;
   const pausedMapControlsTop = pausedTimerCardHeight + MAP_CONTROLS_CARD_GAP;
@@ -80,6 +88,7 @@ export function ActivePloggingScreen() {
   const {
     addPhoto,
     addPhotoObjectUrl,
+    appendRoutePoints,
     caloriesBurned,
     distanceMeters,
     finishSession,
@@ -91,8 +100,9 @@ export function ActivePloggingScreen() {
     startSession,
     stepCount,
   } = usePloggingSession();
-  const visibleRoutePoints =
-    mode === "RECOMMENDED" && recommendedRoutePoints.length >= 2
+  const visibleRoutePoints = !sessionReady
+    ? []
+    : mode === "RECOMMENDED" && recommendedRoutePoints.length >= 2
       ? recommendedRoutePoints
       : routePoints;
   const modeLabel = mode === "RECOMMENDED" ? "AI 추천" : "자유모드";
@@ -103,6 +113,7 @@ export function ActivePloggingScreen() {
   useEffect(() => {
     resetSession({ preserveRecommendedRoute: true });
     startSession();
+    setSessionReady(true);
   }, [resetSession, startSession]);
 
   // GPS는 백그라운드 위치 태스크를 우선 사용하고, 실행 환경이 막으면 foreground 구독으로 폴백한다.
@@ -211,6 +222,48 @@ export function ActivePloggingScreen() {
     };
   }, []);
 
+  const handleEndPlogging = async () => {
+    if (endingRef.current) return;
+    endingRef.current = true;
+
+    const backgroundSessionId = String(timer.startedAt);
+    const snapshotPoints = await readBackgroundPloggingSnapshot()
+      .then((snapshot) => {
+        if (
+          !isBackgroundPloggingSnapshotForSession(
+            snapshot,
+            backgroundSessionId
+          )
+        ) {
+          return [];
+        }
+
+        return snapshot.routePoints.map((point) => ({
+          latitude: point.latitude,
+          longitude: point.longitude,
+        }));
+      })
+      .catch(() => []);
+    const pendingSnapshotPoints = getPendingSnapshotRoutePoints(
+      routePoints,
+      snapshotPoints
+    );
+
+    if (pendingSnapshotPoints.length > 0) {
+      appendRoutePoints(pendingSnapshotPoints);
+    }
+
+    // 종료 시점에 timer가 가진 누적 휴식 시간을 세션 컨텍스트로 옮긴다.
+    // (timer는 화면 unmount 시 사라지므로 report에서 다시 못 읽음)
+    await stopPloggingBackgroundLocation();
+    void endPloggingLiveActivity(liveActivityPayload);
+    const totalElapsedMs = Date.now() - timer.startedAt;
+    const restMs = Math.max(0, totalElapsedMs - timer.elapsedMs);
+    const restSeconds = Math.floor(restMs / 1000);
+    finishSession(restSeconds);
+    router.replace("/report");
+  };
+
   return (
     <ScreenRoot>
       <PloggingMap
@@ -264,15 +317,7 @@ export function ActivePloggingScreen() {
           isPaused={timer.isPaused}
           onCapturePhoto={handleCapturePhoto}
           onEnd={() => {
-            // 종료 시점에 timer가 가진 누적 휴식 시간을 세션 컨텍스트로 옮긴다.
-            // (timer는 화면 unmount 시 사라지므로 report에서 다시 못 읽음)
-            void stopPloggingBackgroundLocation();
-            void endPloggingLiveActivity(liveActivityPayload);
-            const totalElapsedMs = Date.now() - timer.startedAt;
-            const restMs = Math.max(0, totalElapsedMs - timer.elapsedMs);
-            const restSeconds = Math.floor(restMs / 1000);
-            finishSession(restSeconds);
-            router.push("/report");
+            void handleEndPlogging();
           }}
           onTogglePause={timer.toggle}
           pauseTransition={pauseTransition}
@@ -328,6 +373,61 @@ function getTrackingStatusLabel(
   if (status === "foreground-only") return "앱 실행 중 기록";
   if (status === "unavailable") return "권한 확인 필요";
   return "기록 준비 중";
+}
+
+function getPendingSnapshotRoutePoints(
+  currentRoutePoints: RouteLikePoint[],
+  snapshotPoints: RouteLikePoint[]
+) {
+  if (snapshotPoints.length === 0) return [];
+  if (currentRoutePoints.length === 0) return snapshotPoints;
+
+  const lastCurrentPoint = currentRoutePoints[currentRoutePoints.length - 1];
+  const lastAppliedSnapshotIndex = findLastMatchingPointIndex(
+    snapshotPoints,
+    lastCurrentPoint
+  );
+
+  if (lastAppliedSnapshotIndex < 0) return [];
+  return snapshotPoints.slice(lastAppliedSnapshotIndex + 1);
+}
+
+function findLastMatchingPointIndex(
+  points: RouteLikePoint[],
+  target: RouteLikePoint
+) {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    if (
+      haversineMeters(points[index], target) <=
+      SNAPSHOT_ROUTE_POINT_MATCH_THRESHOLD_METERS
+    ) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+const EARTH_RADIUS_METERS = 6_371_000;
+
+function haversineMeters(a: RouteLikePoint, b: RouteLikePoint): number {
+  const phi1 = toRadians(a.latitude);
+  const phi2 = toRadians(b.latitude);
+  const deltaPhi = toRadians(b.latitude - a.latitude);
+  const deltaLambda = toRadians(b.longitude - a.longitude);
+
+  const sinDeltaPhi = Math.sin(deltaPhi / 2);
+  const sinDeltaLambda = Math.sin(deltaLambda / 2);
+
+  const h =
+    sinDeltaPhi * sinDeltaPhi +
+    Math.cos(phi1) * Math.cos(phi2) * sinDeltaLambda * sinDeltaLambda;
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+
+  return EARTH_RADIUS_METERS * c;
+}
+
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
 }
 
 function PloggingTimerCard({
@@ -539,7 +639,7 @@ function ActionDock({
     inputRange: [0, 1],
     outputRange: [12, 36],
   });
-  const dockRadius = pauseTransition.interpolate({
+  const dockBottomRadius = pauseTransition.interpolate({
     inputRange: [0, 1],
     outputRange: [24, 0],
   });
@@ -551,7 +651,10 @@ function ActionDock({
         styles.actionDock,
         isPaused ? styles.actionDockPaused : null,
         {
-          borderRadius: dockRadius,
+          borderBottomLeftRadius: dockBottomRadius,
+          borderBottomRightRadius: dockBottomRadius,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
           bottom: dockBottom,
           height: dockHeight,
           left: dockHorizontal,

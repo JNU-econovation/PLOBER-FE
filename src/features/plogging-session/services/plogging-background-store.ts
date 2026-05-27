@@ -69,6 +69,13 @@ export async function readBackgroundPloggingSnapshot() {
   return cloneSnapshot(memorySnapshot);
 }
 
+export function isBackgroundPloggingSnapshotForSession(
+  snapshot: BackgroundPloggingSnapshot,
+  sessionId: string
+) {
+  return snapshot.active && snapshot.sessionId === sessionId;
+}
+
 export async function resetBackgroundPloggingSession({
   sessionId,
   startedAtMs,
@@ -126,11 +133,8 @@ export async function setBackgroundPloggingStepCount(stepCount: number) {
 }
 
 export async function stopBackgroundPloggingSession() {
-  await updateSnapshot((snapshot) => ({
-    ...snapshot,
-    active: false,
-    isPaused: false,
-    pausedAtMs: null,
+  await updateSnapshot(() => ({
+    ...emptySnapshot,
     updatedAtMs: Date.now(),
   }));
 }

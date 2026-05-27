@@ -1,4 +1,6 @@
+import "@/src/shared/polyfills/text-decoder";
 import { VectorTile } from "@mapbox/vector-tile";
+import { cellToBoundary, isValidCell } from "h3-js";
 import Pbf from "pbf";
 
 import type { HotspotPolygon } from "../components/types";
@@ -51,6 +53,11 @@ type TileDebugStats = {
 type RankedFeature = {
   index: number;
   trashScore: number;
+};
+
+type MapCoord = {
+  latitude: number;
+  longitude: number;
 };
 
 type GeoJsonPolygon = {
@@ -342,13 +349,13 @@ function parseHotspotLayer(
   for (const rankedFeature of selectedFeatures) {
     const feature = layer.feature(rankedFeature.index);
     const h3Cell = getH3Cell(feature.properties);
-    const rings = getOuterRings(
-      (feature.toGeoJSON(tile.x, tile.y, tile.z) as GeoJsonFeature).geometry
-    ).map((ring) =>
-      ring
-        .map(([longitude, latitude]) => ({ latitude, longitude }))
-        .filter(isValidCoord)
-    );
+    // MVT geometry is clipped at tile edges, so rebuild full H3 cells when possible.
+    const h3Ring = getH3CellBoundaryRing(h3Cell);
+    const rings = h3Ring
+      ? [h3Ring]
+      : getGeometryRings(
+          (feature.toGeoJSON(tile.x, tile.y, tile.z) as GeoJsonFeature).geometry
+        );
 
     rings.forEach((coords, ringIndex) => {
       const center = getRingCenter(coords);
@@ -567,6 +574,33 @@ function getOuterRings(geometry: GeoJsonFeature["geometry"]): number[][][] {
     .filter((ring): ring is number[][] => Boolean(ring));
 }
 
+function getGeometryRings(geometry: GeoJsonFeature["geometry"]): MapCoord[][] {
+  return getOuterRings(geometry)
+    .map((ring) =>
+      normalizePolygonRing(
+        ring.map(([longitude, latitude]) => ({ latitude, longitude }))
+      )
+    )
+    .filter((ring) => ring.length >= 4);
+}
+
+export function getH3CellBoundaryRing(h3Cell: string | null): MapCoord[] | null {
+  if (!h3Cell || !isValidCell(h3Cell)) return null;
+
+  try {
+    const boundary = cellToBoundary(h3Cell, true).map(
+      ([longitude, latitude]) => ({
+        latitude,
+        longitude,
+      })
+    );
+    const ring = normalizePolygonRing(boundary);
+    return ring.length >= 4 ? ring : null;
+  } catch {
+    return null;
+  }
+}
+
 function getTrashScore(properties: Record<string, unknown> | undefined): number {
   const value = properties?.trash_score_avg ?? properties?.trash_score;
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
@@ -602,15 +636,53 @@ function isValidCoord(coord: {
   );
 }
 
+function normalizePolygonRing(coords: MapCoord[]): MapCoord[] {
+  const openRing = removeClosingCoord(coords.filter(isValidCoord));
+  if (openRing.length < 3) return [];
+
+  const clockwiseRing =
+    getSignedRingArea(openRing) > 0 ? [...openRing].reverse() : openRing;
+  return [...clockwiseRing, clockwiseRing[0]];
+}
+
+function removeClosingCoord(coords: MapCoord[]): MapCoord[] {
+  if (coords.length < 2) return coords;
+
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  if (coordsEqual(first, last)) {
+    return coords.slice(0, -1);
+  }
+  return coords;
+}
+
+function coordsEqual(a: MapCoord, b: MapCoord): boolean {
+  const epsilon = 1e-12;
+  return (
+    Math.abs(a.latitude - b.latitude) <= epsilon &&
+    Math.abs(a.longitude - b.longitude) <= epsilon
+  );
+}
+
+function getSignedRingArea(coords: MapCoord[]): number {
+  return coords.reduce((area, coord, index) => {
+    const next = coords[(index + 1) % coords.length];
+    return (
+      area + coord.longitude * next.latitude - next.longitude * coord.latitude
+    );
+  }, 0);
+}
+
 export function getHotspotBlobRadius(trashScore: number): number {
   return Math.round(18 + clamp(trashScore, 0, 1) * 22);
 }
 
 function getRingCenter(
-  coords: { latitude: number; longitude: number }[]
-): { latitude: number; longitude: number } | null {
+  coords: MapCoord[]
+): MapCoord | null {
   if (coords.length < 3) return null;
-  const total = coords.reduce(
+  const openRing = removeClosingCoord(coords);
+  const total = openRing.reduce(
     (acc, coord) => ({
       latitude: acc.latitude + coord.latitude,
       longitude: acc.longitude + coord.longitude,
@@ -618,16 +690,16 @@ function getRingCenter(
     { latitude: 0, longitude: 0 }
   );
   return {
-    latitude: total.latitude / coords.length,
-    longitude: total.longitude / coords.length,
+    latitude: total.latitude / openRing.length,
+    longitude: total.longitude / openRing.length,
   };
 }
 
 function getOrganicBlobCoords(
-  center: { latitude: number; longitude: number },
+  center: MapCoord,
   trashScore: number,
   seed: string
-): { latitude: number; longitude: number }[] {
+): MapCoord[] {
   const radiusMeters = getHotspotBlobRadius(trashScore);
   const points = 9;
   const coords = Array.from({ length: points }, (_, index) => {
@@ -637,14 +709,14 @@ function getOrganicBlobCoords(
     return offsetCoord(center, pointRadius, angle);
   }).reverse();
 
-  return [...coords, coords[0]];
+  return normalizePolygonRing(coords);
 }
 
 function offsetCoord(
-  center: { latitude: number; longitude: number },
+  center: MapCoord,
   radiusMeters: number,
   angle: number
-): { latitude: number; longitude: number } {
+): MapCoord {
   const latitudeDelta = (Math.sin(angle) * radiusMeters) / 111_320;
   const longitudeDelta =
     (Math.cos(angle) * radiusMeters) /
