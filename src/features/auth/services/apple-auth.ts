@@ -66,7 +66,6 @@ export async function completeAppleLogin() {
   }
 
   if (__DEV__) {
-    console.log("[apple] identityToken", credential.identityToken);
     console.log("[apple] backend login start");
   }
 

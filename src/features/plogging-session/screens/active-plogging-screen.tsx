@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import {
+  Alert,
   Animated,
   Easing,
   Pressable,
@@ -248,15 +249,30 @@ export function ActivePloggingScreen() {
       routePoints,
       snapshotPoints
     );
+    const completedRoutePoints =
+      pendingSnapshotPoints.length > 0
+        ? [...routePoints, ...pendingSnapshotPoints]
+        : routePoints;
 
     if (pendingSnapshotPoints.length > 0) {
       appendRoutePoints(pendingSnapshotPoints);
     }
 
-    // 종료 시점에 timer가 가진 누적 휴식 시간을 세션 컨텍스트로 옮긴다.
-    // (timer는 화면 unmount 시 사라지므로 report에서 다시 못 읽음)
     await stopPloggingBackgroundLocation();
     void endPloggingLiveActivity(liveActivityPayload);
+
+    if (completedRoutePoints.length === 0) {
+      resetSession();
+      router.replace("/");
+      Alert.alert(
+        "플로깅 취소",
+        "경로 정보가 없어 이번 플로깅은 기록하지 않았습니다."
+      );
+      return;
+    }
+
+    // 종료 시점에 timer가 가진 누적 휴식 시간을 세션 컨텍스트로 옮긴다.
+    // (timer는 화면 unmount 시 사라지므로 report에서 다시 못 읽음)
     const totalElapsedMs = Date.now() - timer.startedAt;
     const restMs = Math.max(0, totalElapsedMs - timer.elapsedMs);
     const restSeconds = Math.floor(restMs / 1000);

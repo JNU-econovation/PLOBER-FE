@@ -1,6 +1,5 @@
 import { Alert, Linking } from "react-native";
 import * as Location from "expo-location";
-import * as TaskManager from "expo-task-manager";
 
 import "./plogging-background-location-task";
 import {
@@ -17,6 +16,8 @@ export type BackgroundTrackingStartResult =
 
 const BACKGROUND_PERMISSION_MESSAGE =
   "화면을 끄거나 다른 앱을 사용해도 플로깅 경로를 기록하려면 위치 권한을 항상 허용으로 설정해주세요.";
+
+type TaskManagerModule = typeof import("expo-task-manager");
 
 export async function startPloggingBackgroundLocation({
   startedAtMs,
@@ -37,6 +38,15 @@ export async function startPloggingBackgroundLocation({
       status: "foreground-only",
       message:
         "백그라운드 위치 권한이 없어 앱이 열린 동안에만 경로를 기록합니다.",
+    };
+  }
+
+  const TaskManager = await loadTaskManager();
+  if (!TaskManager) {
+    return {
+      status: "foreground-only",
+      message:
+        "현재 실행 환경에서는 백그라운드 위치 기록을 사용할 수 없습니다. 개발 빌드나 실제 앱 빌드에서 동작합니다.",
     };
   }
 
@@ -100,6 +110,19 @@ export async function stopPloggingBackgroundLocation() {
 
 export async function pausePloggingBackgroundLocation(isPaused: boolean) {
   await setBackgroundPloggingPaused(isPaused);
+}
+
+async function loadTaskManager(): Promise<TaskManagerModule | null> {
+  try {
+    return await import("expo-task-manager");
+  } catch (error) {
+    if (__DEV__) {
+      console.log("[plogging-background-location] task manager unavailable", {
+        message: error instanceof Error ? error.message : "unknown error",
+      });
+    }
+    return null;
+  }
 }
 
 async function ensureForegroundPermission() {
