@@ -7,7 +7,6 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system/legacy";
-import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -45,6 +44,8 @@ const FLOATING_SHARE_BUTTON_BOB_DISTANCE = 5;
 const SHARE_PREVIEW_WIDTH = 390;
 
 type MapImageCaptureState = "idle" | "capturing" | "captured" | "error";
+type MediaLibraryModule = typeof import("expo-media-library");
+type PhotoSavePermissionResult = "denied" | "granted" | "unavailable";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -158,12 +159,28 @@ async function sharePloggingImage({
   );
 }
 
-async function requestPhotoSavePermission(): Promise<boolean> {
+async function requestPhotoSavePermission(): Promise<PhotoSavePermissionResult> {
+  const MediaLibrary = await loadMediaLibrary();
+  if (!MediaLibrary) return "unavailable";
+
   const permission = await MediaLibrary.getPermissionsAsync(true);
-  if (permission.granted) return true;
+  if (permission.granted) return "granted";
 
   const requestedPermission = await MediaLibrary.requestPermissionsAsync(true);
-  return requestedPermission.granted;
+  return requestedPermission.granted ? "granted" : "denied";
+}
+
+async function loadMediaLibrary(): Promise<MediaLibraryModule | null> {
+  try {
+    return await import("expo-media-library");
+  } catch (error) {
+    if (__DEV__) {
+      console.log("[plogging-report] media library unavailable", {
+        message: error instanceof Error ? error.message : "unknown",
+      });
+    }
+    return null;
+  }
 }
 
 async function ensureSavablePngFileUri(uri: string): Promise<string> {
@@ -431,8 +448,15 @@ export function ReportScreen() {
 
     setSavingImage(true);
     try {
-      const permissionGranted = await requestPhotoSavePermission();
-      if (!permissionGranted) {
+      const permissionResult = await requestPhotoSavePermission();
+      if (permissionResult === "unavailable") {
+        Alert.alert(
+          "저장 미지원",
+          "현재 실행 환경에서는 사진 앱 저장을 사용할 수 없습니다. 개발 빌드나 실제 앱 빌드에서 다시 시도해주세요."
+        );
+        return;
+      }
+      if (permissionResult === "denied") {
         Alert.alert(
           "저장 실패",
           "사진 앱에 저장하려면 사진 추가 권한이 필요합니다."
@@ -448,6 +472,15 @@ export function ReportScreen() {
         result: "tmpfile",
       });
       const savableImageUri = await ensureSavablePngFileUri(imageUri);
+
+      const MediaLibrary = await loadMediaLibrary();
+      if (!MediaLibrary) {
+        Alert.alert(
+          "저장 미지원",
+          "현재 실행 환경에서는 사진 앱 저장을 사용할 수 없습니다. 개발 빌드나 실제 앱 빌드에서 다시 시도해주세요."
+        );
+        return;
+      }
 
       await MediaLibrary.saveToLibraryAsync(savableImageUri);
       Alert.alert(
@@ -477,9 +510,11 @@ export function ReportScreen() {
       return;
     }
     if (!hasRouteForMap) {
+      resetSession();
+      router.replace("/");
       Alert.alert(
-        "저장 실패",
-        "경로 정보가 없어 지도 이미지를 만들 수 없습니다."
+        "플로깅 취소",
+        "경로 정보가 없어 이번 플로깅은 기록하지 않았습니다."
       );
       return;
     }
