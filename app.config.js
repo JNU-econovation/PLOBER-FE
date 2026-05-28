@@ -62,6 +62,7 @@ export default ({ config }) => ({
     usesCleartextTraffic: true,
     predictiveBackGestureEnabled: false,
     package: "com.econovation.plover",
+    versionCode: 1,
     // Android 권한: 위치/만보기 + 카메라/사진 선택
     permissions: [
       "ACCESS_COARSE_LOCATION",
