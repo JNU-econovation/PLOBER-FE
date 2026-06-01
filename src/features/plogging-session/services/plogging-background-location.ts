@@ -1,4 +1,4 @@
-import { Alert, Linking } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 import * as Location from "expo-location";
 
 import "./plogging-background-location-task";
@@ -29,6 +29,14 @@ export async function startPloggingBackgroundLocation({
     return {
       status: "denied",
       message: "위치 권한이 없어 플로깅 경로를 기록할 수 없습니다.",
+    };
+  }
+
+  if (Platform.OS === "android") {
+    return {
+      status: "foreground-only",
+      message:
+        "Android production builds temporarily use location only while the app is open.",
     };
   }
 

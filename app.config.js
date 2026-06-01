@@ -15,6 +15,7 @@ export default ({ config }) => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.econovation.plover",
+    buildNumber: "2",
     usesAppleSignIn: true,
     // iOS 위치 권한 메시지 추가
     infoPlist: {
@@ -54,6 +55,7 @@ export default ({ config }) => ({
   },
   
   android: {
+    versionCode: 2,
     adaptiveIcon: {
       backgroundColor: "#FFFFFF",
       foregroundImage: "./assets/icons/appIcon-native.png",
@@ -66,9 +68,6 @@ export default ({ config }) => ({
     permissions: [
       "ACCESS_COARSE_LOCATION",
       "ACCESS_FINE_LOCATION",
-      "ACCESS_BACKGROUND_LOCATION",
-      "FOREGROUND_SERVICE",
-      "FOREGROUND_SERVICE_LOCATION",
       "POST_NOTIFICATIONS",
       "ACTIVITY_RECOGNITION",
       "CAMERA",
@@ -79,6 +78,9 @@ export default ({ config }) => ({
     // 갤러리 목록 열람 기능이 없고, expo-image-picker는 Android 13+ Photo Picker로
     // 권한 없이 동작하며 expo-media-library는 저장(writeOnly)만 사용하므로 영향 없음.
     blockedPermissions: [
+      "android.permission.ACCESS_BACKGROUND_LOCATION",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.FOREGROUND_SERVICE_LOCATION",
       "android.permission.READ_MEDIA_IMAGES",
       "android.permission.READ_MEDIA_VIDEO",
     ],
@@ -100,9 +102,8 @@ export default ({ config }) => ({
         locationWhenInUsePermission: "플로깅 경로 기록 및 현재 위치 표시를 위해 위치 권한이 필요합니다.",
         locationAlwaysAndWhenInUsePermission: "화면을 끄거나 다른 앱을 사용해도 플로깅 경로를 기록하기 위해 위치 권한이 필요합니다.",
         isIosBackgroundLocationEnabled: true,
-        isAndroidBackgroundLocationEnabled: true,
-        isAndroidForegroundServiceEnabled: true,
-        androidForegroundServiceIcon: "./assets/images/android-icon-monochrome.png",
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
       },
     ],
     [
