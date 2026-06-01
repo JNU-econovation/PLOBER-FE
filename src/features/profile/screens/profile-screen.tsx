@@ -77,6 +77,9 @@ async function ensurePhotoLibraryPermission(
   imagePicker: typeof ExpoImagePicker
 ): Promise<boolean> {
   if (Platform.OS === "web") return true;
+  // Android 13+ Photo Picker는 READ_MEDIA_IMAGES 없이도 동작하며,
+  // 매니페스트에서 해당 권한을 차단했으므로 게이트를 건너뛰고 picker로 위임한다.
+  if (Platform.OS === "android") return true;
 
   const currentPermission =
     await imagePicker.getMediaLibraryPermissionsAsync();

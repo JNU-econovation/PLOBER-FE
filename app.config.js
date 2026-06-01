@@ -5,7 +5,7 @@ export default ({ config }) => ({
   ...config,
   name: "플로버",
   slug: "NaverMapPloggingApp",
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "portrait",
   icon: "./assets/icons/appIcon-native.png",
   scheme: "navermapploggingapp",
@@ -74,6 +74,13 @@ export default ({ config }) => ({
       "CAMERA",
       "READ_EXTERNAL_STORAGE",
       "WRITE_EXTERNAL_STORAGE",
+    ],
+    // Google Play 정책 위반(READ_MEDIA_IMAGES/VIDEO) 회피.
+    // 갤러리 목록 열람 기능이 없고, expo-image-picker는 Android 13+ Photo Picker로
+    // 권한 없이 동작하며 expo-media-library는 저장(writeOnly)만 사용하므로 영향 없음.
+    blockedPermissions: [
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.READ_MEDIA_VIDEO",
     ],
   },
   
