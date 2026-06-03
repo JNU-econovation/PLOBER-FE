@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useDeviceLocation } from "@/src/shared/location";
-
 import type { HotspotPolygon } from "../components/types";
 import {
   getHotspotPolygonsNearProgressive,
@@ -13,11 +11,16 @@ type HotspotPolygonsState =
   | { status: "success"; polygons: HotspotPolygon[] }
   | { status: "error"; message: string; polygons: HotspotPolygon[] };
 
+type HotspotCenter = {
+  latitude: number;
+  longitude: number;
+};
+
 export function useHotspotPolygons(
   enabled: boolean,
-  zoomLevel: number
+  zoomLevel: number,
+  center: HotspotCenter | null
 ): HotspotPolygonsState {
-  const { permission, position } = useDeviceLocation();
   const [state, setState] = useState<HotspotPolygonsState>({
     polygons: [],
     status: "idle",
@@ -31,34 +34,26 @@ export function useHotspotPolygons(
       fetchedKeyRef.current = null;
       return;
     }
-    if (permission === "denied" || permission === "unavailable") {
-      logHotspotHookDebug("permission-blocked", { permission });
-      setState({
-        message: "위치 권한이 필요합니다.",
-        polygons: [],
-        status: "error",
-      });
-      return;
-    }
-    if (!position) {
-      logHotspotHookDebug("waiting-position", { permission });
+
+    if (!center) {
+      logHotspotHookDebug("waiting-camera-center");
       setState((prev) => ({ polygons: prev.polygons, status: "loading" }));
       return;
     }
 
-    const key = getHotspotTileKey(position, zoomLevel);
+    const key = getHotspotTileKey(center, zoomLevel);
     if (fetchedKeyRef.current === key) {
-      logHotspotHookDebug("skip-same-tile", { key, position });
+      logHotspotHookDebug("skip-same-tile", { center, key });
       return;
     }
     fetchedKeyRef.current = key;
 
     let mounted = true;
-    logHotspotHookDebug("load-start", { key, position });
+    logHotspotHookDebug("load-start", { center, key });
     setState((prev) => ({ polygons: prev.polygons, status: "loading" }));
 
     getHotspotPolygonsNearProgressive(
-      position,
+      center,
       zoomLevel,
       (polygons, phase) => {
         if (!mounted) return;
@@ -104,7 +99,7 @@ export function useHotspotPolygons(
     return () => {
       mounted = false;
     };
-  }, [enabled, permission, position, zoomLevel]);
+  }, [center, enabled, zoomLevel]);
 
   return state;
 }
