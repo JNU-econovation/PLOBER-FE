@@ -38,6 +38,20 @@
 - Communication: 모든 API 요청은 services/ 폴더 내에서 관리.
 - Git: 커밋 메시지는 한글 사용 권장 (예: [Feat] AI 경로 추천 카드 UI 구현).
 
+## Build Rule
+
+이 프로젝트는 **로컬 빌드(`gradlew bundleRelease` 등)** 를 사용한다. EAS Build는 사용하지 않는다.
+
+버전 관리 정책:
+
+- `eas.json`의 `appVersionSource`는 `"local"`로 유지한다. `"remote"`로 바꾸지 않는다.
+- Android의 versionCode/versionName은 **`android/app/build.gradle`** 의 값이 실제 빌드에 들어간다.
+  `app.config.js`의 `android.versionCode`와 항상 일치시킨다.
+- iOS의 buildNumber/version은 `app.config.js`와 (있다면) `ios/` 네이티브 파일을 함께 맞춘다.
+- 버전을 올릴 때는 위 파일들을 모두 같은 값으로 동기화해 커밋한다.
+
+빌드 산출물 경로: `android/app/build/outputs/bundle/release/app-release.aab`
+
 ## API Change Rule
 
 API 관련 코드를 추가, 수정, 디버깅할 때는 반드시 먼저 `docs/api.md`를 확인한다.
