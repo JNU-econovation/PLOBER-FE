@@ -47,11 +47,16 @@ const FACILITY_MARKER_ICON_SIZE = 20;
 const FACILITY_MARKER_HIDE_ZOOM = 13.8;
 const FACILITY_MARKER_FULL_ZOOM = 15;
 const FACILITY_MARKER_ZOOM_UPDATE_THRESHOLD = 0.04;
+const HOTSPOT_CENTER_UPDATE_THRESHOLD = 0.00001;
 
 type FacilityIconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 type CameraChangedParams = Parameters<
   NonNullable<NaverMapViewProps["onCameraChanged"]>
 >[0];
+type MapCoord = {
+  latitude: number;
+  longitude: number;
+};
 
 export function PloggingMap({
   children,
@@ -73,7 +78,6 @@ export function PloggingMap({
   const positionLongitude = position?.longitude;
   const initialZoom = zoom ?? CAMPUS_CAMERA.zoom;
   const [cameraZoom, setCameraZoom] = useState(initialZoom);
-  const hotspots = useHotspotPolygons(heatmapVisible, cameraZoom);
   const visibleRoutePoints =
     routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
   const routeGuides = useMemo(
@@ -109,6 +113,20 @@ export function PloggingMap({
     longitude: initialPosition?.longitude ?? FALLBACK_CAMERA.longitude,
     zoom: initialPosition ? initialZoom : FALLBACK_CAMERA.zoom,
   };
+  const [cameraCenter, setCameraCenter] = useState<MapCoord | null>(null);
+  const hotspotCenter = useMemo(
+    () =>
+      cameraCenter ?? {
+        latitude: initialCamera.latitude,
+        longitude: initialCamera.longitude,
+      },
+    [cameraCenter, initialCamera.latitude, initialCamera.longitude]
+  );
+  const hotspots = useHotspotPolygons(
+    heatmapVisible && !waitingForInitialPosition,
+    cameraZoom,
+    hotspotCenter
+  );
 
   useEffect(() => {
     if (
@@ -131,6 +149,10 @@ export function PloggingMap({
       longitude: positionLongitude,
       duration: 500,
     });
+    setCameraCenter({
+      latitude: positionLatitude,
+      longitude: positionLongitude,
+    });
     lastAnimatedRef.current = {
       latitude: positionLatitude,
       longitude: positionLongitude,
@@ -147,6 +169,27 @@ export function PloggingMap({
   };
 
   const handleCameraChanged = useCallback((params: CameraChangedParams) => {
+    if (
+      typeof params.latitude === "number" &&
+      typeof params.longitude === "number"
+    ) {
+      setCameraCenter((prevCenter) => {
+        if (
+          prevCenter &&
+          Math.abs(prevCenter.latitude - params.latitude) <
+            HOTSPOT_CENTER_UPDATE_THRESHOLD &&
+          Math.abs(prevCenter.longitude - params.longitude) <
+            HOTSPOT_CENTER_UPDATE_THRESHOLD
+        ) {
+          return prevCenter;
+        }
+        return {
+          latitude: params.latitude,
+          longitude: params.longitude,
+        };
+      });
+    }
+
     const nextZoom = params.zoom;
     if (typeof nextZoom === "number") {
       setCameraZoom((prevZoom) =>
