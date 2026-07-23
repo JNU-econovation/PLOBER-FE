@@ -11,12 +11,75 @@ export default ({ config }) => ({
   scheme: "navermapploggingapp",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
+  updates: {
+    url: "https://u.expo.dev/2f86cd67-1abb-4c64-a62b-5df3a9535df7",
+    checkAutomatically: "ON_LOAD",
+    fallbackToCacheTimeout: 0,
+  },
+  // Tracked native iOS projects must use an explicit EAS Update runtime.
+  // Keep this value in sync whenever `version` changes.
+  runtimeVersion: "1.0.1",
   
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.econovation.plover",
-    buildNumber: "2",
+    buildNumber: "18",
     usesAppleSignIn: true,
+    privacyManifests: {
+      NSPrivacyCollectedDataTypes: [
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeEmailAddress",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+          ],
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeUserID",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+          ],
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypePreciseLocation",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+            "NSPrivacyCollectedDataTypePurposeProductPersonalization",
+          ],
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeFitness",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+          ],
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypePhotosorVideos",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+          ],
+        },
+        {
+          NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeOtherUserContent",
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: [
+            "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+          ],
+        },
+      ],
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
+    },
     // iOS 위치 권한 메시지 추가
     infoPlist: {
       CFBundleAllowMixedLocalizations: true,
@@ -28,7 +91,7 @@ export default ({ config }) => ({
       NSMotionUsageDescription: "플로깅 중 걸음 수를 측정하기 위해 동작 인식 권한이 필요합니다.",
       NSPhotoLibraryUsageDescription: "프로필 이미지 선택 및 플로깅 리포트 이미지 저장을 위해 사진 접근 권한이 필요합니다.",
       NSPhotoLibraryAddUsageDescription: "플로깅 리포트 이미지를 사진 앱에 저장하기 위해 권한이 필요합니다.",
-      NSCameraUsageDescription: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
+      NSCameraUsageDescription: "플로깅 인증샷 촬영과 쓰레기 제보를 위해 카메라 접근 권한이 필요합니다.",
       NSSupportsLiveActivities: true,
       UIBackgroundModes: ["location"],
       NSAppTransportSecurity: {
@@ -64,7 +127,6 @@ export default ({ config }) => ({
     usesCleartextTraffic: true,
     predictiveBackGestureEnabled: false,
     package: "com.econovation.plover",
-    versionCode: 1,
     // Android 권한: 위치/만보기 + 카메라/사진 선택
     permissions: [
       "ACCESS_COARSE_LOCATION",
@@ -94,9 +156,15 @@ export default ({ config }) => ({
   
   plugins: [
     "expo-router",
+    "expo-font",
     "expo-apple-authentication",
     "expo-web-browser",
-    "expo-secure-store",
+    [
+      "expo-secure-store",
+      {
+        faceIDPermission: false,
+      },
+    ],
     [
       "expo-location",
       {
@@ -111,7 +179,7 @@ export default ({ config }) => ({
       "expo-image-picker",
       {
         photosPermission: "프로필 이미지 선택 및 플로깅 리포트 이미지 저장을 위해 사진 접근 권한이 필요합니다.",
-        cameraPermission: "플로깅 인증샷 촬영을 위해 카메라 접근 권한이 필요합니다.",
+        cameraPermission: "플로깅 인증샷 촬영과 쓰레기 제보를 위해 카메라 접근 권한이 필요합니다.",
         microphonePermission: false,
       },
     ],

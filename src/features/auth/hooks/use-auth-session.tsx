@@ -37,7 +37,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       if (mounted) setSession(nextSession);
     });
 
-    getSession()
+    const sessionPromise = getSession();
+    sessionPromise
       .then((storedSession) => {
         if (mounted) setSession(storedSession);
       })

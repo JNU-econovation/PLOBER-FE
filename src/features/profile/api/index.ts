@@ -6,8 +6,6 @@ export { updateMyNickname } from "./update-my-nickname";
 export { updateMyProfileImage } from "./update-my-profile-image";
 export type { MyPloggingStats, UserProfile } from "./types";
 export type {
-  DeleteMyAccountRequest,
-  GetMyPloggingStatsRequest,
   GetProfileImageUploadUrlRequest,
   GetProfileImageUploadUrlResponse,
   ProfileImageUploadContentType,

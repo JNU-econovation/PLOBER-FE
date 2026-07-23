@@ -17,7 +17,11 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="history" options={{ title: "기록" }} />
       <Tabs.Screen name="index" options={{ title: "홈" }} />
-      <Tabs.Screen name="profile" options={{ title: "프로필" }} />
+      <Tabs.Screen name="crews" options={{ title: "크루" }} />
+      <Tabs.Screen
+        name="profile"
+        options={{ href: null, title: "프로필" }}
+      />
     </Tabs>
   );
 }

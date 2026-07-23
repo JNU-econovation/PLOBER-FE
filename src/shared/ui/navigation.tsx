@@ -1,18 +1,19 @@
 import { Image } from "expo-image";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { usePathname, useSegments } from "expo-router";
 import type { ComponentProps } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { fontFamilies, getSafeLineHeight } from "@/src/shared/theme";
 
 type TabIconSource = ComponentProps<typeof Image>["source"];
 
-export const TAB_BAR_HEIGHT = 84;
-const TAB_ICON_SIZE = 36;
+export const TAB_BAR_HEIGHT = 56;
 
 export function useTabBarHeight() {
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === "android" ? insets.bottom : 0;
-  return TAB_BAR_HEIGHT + bottomInset;
+  return TAB_BAR_HEIGHT + insets.bottom;
 }
 
 const tabConfig: Record<
@@ -33,10 +34,10 @@ const tabConfig: Record<
     icon: require("@/assets/icons/tab-home.svg"),
     label: "홈",
   },
-  profile: {
-    activeIcon: require("@/assets/icons/tab-profile-active.svg"),
-    icon: require("@/assets/icons/tab-profile.svg"),
-    label: "프로필",
+  crews: {
+    activeIcon: require("@/assets/icons/tab-crew-active.svg"),
+    icon: require("@/assets/icons/tab-crew.svg"),
+    label: "크루",
   },
 };
 
@@ -46,24 +47,42 @@ export function PloggingTabBar({
   state,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === "android" ? insets.bottom : 0;
+  const pathname = usePathname();
+  const segments = useSegments();
+  const bottomInset = insets.bottom;
+  const activeRouteName = state.routes[state.index]?.name;
+
+  // Expo Router may expose a nested dynamic route as either resolved ids or
+  // bracketed route segments. Record detail is a full-screen report in Figma,
+  // so match the stable segment instead of assuming numeric pathname values.
+  const recordsSegmentIndex = segments.findIndex(
+    (segment) => segment === "records",
+  );
+  if (
+    /\/records\/[^/]+\/?$/.test(pathname) ||
+    (recordsSegmentIndex >= 0 && recordsSegmentIndex < segments.length - 1)
+  ) {
+    return null;
+  }
 
   return (
     <View
       accessibilityRole="tablist"
       style={[
         styles.bottomTabs,
-        bottomInset > 0
-          ? {
-              height: TAB_BAR_HEIGHT + bottomInset,
-              paddingBottom: bottomInset,
-            }
-          : null,
+        {
+          height: TAB_BAR_HEIGHT + bottomInset,
+          paddingBottom: bottomInset,
+        },
       ]}
     >
       <View style={styles.tabRow}>
         {state.routes.map((route, index) => {
-          const selected = state.index === index;
+          const routeSelected = state.index === index;
+          const selected =
+            activeRouteName === "profile"
+              ? route.name === "index"
+              : routeSelected;
           const config = tabConfig[route.name];
 
           if (!config) {
@@ -88,7 +107,7 @@ export function PloggingTabBar({
                   type: "tabPress",
                 });
 
-                if (!selected && !event.defaultPrevented) {
+                if (!routeSelected && !event.defaultPrevented) {
                   navigation.navigate(route.name, route.params);
                 }
               }}
@@ -108,6 +127,14 @@ export function PloggingTabBar({
                 source={selected ? config.activeIcon : config.icon}
                 style={styles.tabIcon}
               />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  selected ? styles.tabLabelSelected : null,
+                ]}
+              >
+                {config.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -118,13 +145,14 @@ export function PloggingTabBar({
 
 const styles = StyleSheet.create({
   bottomTabs: {
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#FFFFFF",
     bottom: 0,
     height: TAB_BAR_HEIGHT,
     left: 0,
     position: "absolute",
     right: 0,
     boxShadow: "0 0 21.2px rgba(0, 0, 0, 0.07)",
+    elevation: 8,
   },
   pressed: {
     opacity: 0.72,
@@ -132,19 +160,30 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     alignItems: "center",
-    height: 56,
+    flex: 1,
+    gap: 1,
+    height: TAB_BAR_HEIGHT,
     justifyContent: "center",
-    width: 56,
+    minWidth: 44,
   },
   tabIcon: {
-    height: TAB_ICON_SIZE,
-    width: TAB_ICON_SIZE,
+    height: 28,
+    width: 28,
+  },
+  tabLabel: {
+    color: "#535353",
+    fontFamily: fontFamilies.medium,
+    fontSize: 11,
+    lineHeight: getSafeLineHeight(11, fontFamilies.medium, 13),
+  },
+  tabLabelSelected: {
+    color: "#121212",
   },
   tabRow: {
     alignItems: "center",
     flexDirection: "row",
     height: TAB_BAR_HEIGHT,
-    justifyContent: "space-between",
-    paddingHorizontal: 34,
+    justifyContent: "space-around",
+    paddingHorizontal: 8,
   },
 });

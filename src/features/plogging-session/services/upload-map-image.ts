@@ -12,7 +12,6 @@ const MAP_IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
 
 export async function uploadMapImage(
   localUri: string,
-  userId: number,
   contentType: MapImageUploadContentType = DEFAULT_CONTENT_TYPE
 ): Promise<UploadMapImageResult> {
   try {
@@ -24,7 +23,6 @@ export async function uploadMapImage(
 
     const { uploadUrl, objectUrl } = await getMapImageUploadUrl({
       contentType,
-      userId,
     });
 
     const uploadResponse = await uploadLocalImageFile({

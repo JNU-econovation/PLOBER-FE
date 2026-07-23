@@ -7,6 +7,11 @@ export type BackgroundRoutePoint = RoutePoint & {
   recordedAtMs: number;
 };
 
+export type BackgroundStepSample = {
+  recordedAtMs: number;
+  stepCount: number;
+};
+
 export type BackgroundPloggingSnapshot = {
   active: boolean;
   distanceMeters: number;
@@ -17,6 +22,7 @@ export type BackgroundPloggingSnapshot = {
   sessionId: string | null;
   startedAtMs: number | null;
   stepCount: number;
+  stepSamples: BackgroundStepSample[];
   updatedAtMs: number;
 };
 
@@ -32,6 +38,7 @@ type SnapshotListener = (snapshot: BackgroundPloggingSnapshot) => void;
 const ACCURACY_THRESHOLD_METERS = 30;
 const DUPLICATE_DISTANCE_METERS = 2;
 const MAX_ROUTE_POINTS = 8_000;
+const MAX_STEP_SAMPLES = 8_000;
 const STORE_DIR = `${FileSystem.documentDirectory ?? ""}plogging/`;
 const STORE_FILE = `${STORE_DIR}active-session.json`;
 
@@ -45,6 +52,7 @@ const emptySnapshot: BackgroundPloggingSnapshot = {
   sessionId: null,
   startedAtMs: null,
   stepCount: 0,
+  stepSamples: [],
   updatedAtMs: 0,
 };
 
@@ -124,10 +132,20 @@ export async function setBackgroundPloggingPaused(isPaused: boolean) {
 export async function setBackgroundPloggingStepCount(stepCount: number) {
   await updateSnapshot((snapshot) => {
     if (!snapshot.active) return snapshot;
+    const nextStepCount = Math.max(snapshot.stepCount, Math.floor(stepCount));
+    if (nextStepCount === snapshot.stepCount) return snapshot;
+    const sample: BackgroundStepSample = {
+      recordedAtMs: Date.now(),
+      stepCount: nextStepCount,
+    };
     return {
       ...snapshot,
-      stepCount: Math.max(snapshot.stepCount, Math.floor(stepCount)),
-      updatedAtMs: Date.now(),
+      stepCount: nextStepCount,
+      stepSamples:
+        snapshot.stepSamples.length >= MAX_STEP_SAMPLES
+          ? [...snapshot.stepSamples.slice(1), sample]
+          : [...snapshot.stepSamples, sample],
+      updatedAtMs: sample.recordedAtMs,
     };
   });
 }
@@ -259,6 +277,7 @@ function cloneSnapshot(
   return {
     ...snapshot,
     routePoints: snapshot.routePoints.map((point) => ({ ...point })),
+    stepSamples: snapshot.stepSamples.map((sample) => ({ ...sample })),
   };
 }
 
@@ -268,6 +287,9 @@ function sanitizeSnapshot(value: unknown): BackgroundPloggingSnapshot {
   const candidate = value as Partial<BackgroundPloggingSnapshot>;
   const routePoints = Array.isArray(candidate.routePoints)
     ? candidate.routePoints.filter(isRoutePoint)
+    : [];
+  const stepSamples = Array.isArray(candidate.stepSamples)
+    ? candidate.stepSamples.filter(isStepSample)
     : [];
 
   return {
@@ -292,9 +314,22 @@ function sanitizeSnapshot(value: unknown): BackgroundPloggingSnapshot {
       typeof candidate.stepCount === "number"
         ? Math.max(0, Math.floor(candidate.stepCount))
         : 0,
+    stepSamples,
     updatedAtMs:
       typeof candidate.updatedAtMs === "number" ? candidate.updatedAtMs : 0,
   };
+}
+
+function isStepSample(value: unknown): value is BackgroundStepSample {
+  if (!value || typeof value !== "object") return false;
+  const sample = value as Partial<BackgroundStepSample>;
+  return (
+    typeof sample.recordedAtMs === "number" &&
+    Number.isFinite(sample.recordedAtMs) &&
+    typeof sample.stepCount === "number" &&
+    Number.isFinite(sample.stepCount) &&
+    sample.stepCount >= 0
+  );
 }
 
 function isRoutePoint(value: unknown): value is BackgroundRoutePoint {

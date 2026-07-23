@@ -1,5 +1,9 @@
-<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M31.5 30H4.5" stroke="#33363F" stroke-width="2" stroke-linecap="round"/>
-<path d="M15 24V14C15 12.8954 14.1046 12 13 12H11C9.89543 12 9 12.8954 9 14V24" stroke="#33363F" stroke-width="2" stroke-linecap="round"/>
-<path d="M27 24V8C27 6.89543 26.1046 6 25 6H23C21.8954 6 21 6.89543 21 8V24" stroke="#33363F" stroke-width="2" stroke-linecap="round"/>
+<svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon">
+<g id="icon/&#234;&#184;&#176;&#235;&#161;&#157;_line">
+<path id="Rectangle 25" d="M29.75 28.3333H4.25" stroke="#535353" stroke-width="2" stroke-linecap="round"/>
+<path id="Rectangle 4150" d="M14.1667 22.6667V13.3333C14.1667 12.2288 13.2712 11.3333 12.1667 11.3333H10.5C9.39543 11.3333 8.5 12.2288 8.5 13.3333V22.6667" stroke="#535353" stroke-width="2" stroke-linecap="round"/>
+<path id="Rectangle 4151" d="M25.4999 22.6667V7.66667C25.4999 6.5621 24.6045 5.66667 23.4999 5.66667H21.8333C20.7287 5.66667 19.8333 6.5621 19.8333 7.66667V22.6667" stroke="#535353" stroke-width="2" stroke-linecap="round"/>
+</g>
+</g>
 </svg>

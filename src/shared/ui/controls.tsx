@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, shadows } from "../theme";
+import { colors, fontFamilies, shadows } from "../theme";
 
 type FeatherName = ComponentProps<typeof Feather>["name"];
 type MapControlIconSource = ComponentProps<typeof Image>["source"];
@@ -313,9 +313,9 @@ const styles = StyleSheet.create<{
     alignItems: "center",
     backgroundColor: "#FAFAFA",
     borderRadius: 12,
-    height: 34,
+    height: 44,
     justifyContent: "center",
-    width: 34,
+    width: 44,
     boxShadow: "0 0 21.2px rgba(0, 0, 0, 0.07)",
   },
   pressed: {
@@ -346,9 +346,9 @@ const styles = StyleSheet.create<{
   },
   primaryBottomText: {
     color: colors.surface,
+    fontFamily: fontFamilies.medium,
     fontSize: 22,
-    fontWeight: "500",
-    letterSpacing: 0,
+    letterSpacing: -0.44,
   },
   modeSwitch: {
     alignSelf: "center",

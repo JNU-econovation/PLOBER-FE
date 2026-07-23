@@ -10,6 +10,7 @@ import {
   stopPloggingBackgroundLocation,
 } from "../services/plogging-background-location";
 import {
+  appendBackgroundPloggingLocations,
   isBackgroundPloggingSnapshotForSession,
   readBackgroundPloggingSnapshot,
   setBackgroundPloggingStepCount,
@@ -33,7 +34,9 @@ export type PloggingTrackerState = {
 };
 
 type UsePloggingTrackerOptions = {
+  enabled?: boolean;
   isPaused: boolean;
+  sessionId?: string;
   startedAtMs: number;
 };
 
@@ -41,17 +44,18 @@ type UsePloggingTrackerOptions = {
 const ACCURACY_THRESHOLD_METERS = 30;
 
 export function usePloggingTracker({
+  enabled = true,
   isPaused,
+  sessionId,
   startedAtMs,
 }: UsePloggingTrackerOptions): PloggingTrackerState {
   const {
     addSteps,
-    appendRoutePoint,
     appendRoutePoints,
     setPlaceName,
     stepCount,
   } = usePloggingSession();
-  const backgroundSessionId = String(startedAtMs);
+  const backgroundSessionId = sessionId ?? String(startedAtMs);
 
   const [locationPermission, setLocationPermission] =
     useState<PermissionStatus>("idle");
@@ -65,10 +69,15 @@ export function usePloggingTracker({
 
   const isPausedRef = useRef(isPaused);
   const appBackgroundedAtRef = useRef<number | null>(null);
-  const appliedBackgroundRouteCountRef = useRef(0);
+  const appliedBackgroundRouteCursorRef = useRef<{
+    key: string;
+    recordedAtMs: number;
+  } | null>(null);
+  const appliedBackgroundStepCountRef = useRef(0);
   const lastPedometerStepsRef = useRef<number | null>(null);
   const placeNameSetRef = useRef(false);
   const skipNextPedometerBaselineRef = useRef(false);
+  const pedometerSyncInProgressRef = useRef(false);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -82,16 +91,32 @@ export function usePloggingTracker({
           backgroundSessionId
         )
       ) {
-        appliedBackgroundRouteCountRef.current = 0;
+        appliedBackgroundRouteCursorRef.current = null;
+        appliedBackgroundStepCountRef.current = 0;
         return;
       }
 
-      if (snapshot.routePoints.length < appliedBackgroundRouteCountRef.current) {
-        appliedBackgroundRouteCountRef.current = 0;
+      let firstNewPointIndex = 0;
+      const cursor = appliedBackgroundRouteCursorRef.current;
+      if (cursor) {
+        const cursorIndex = snapshot.routePoints.findIndex(
+          (point) => getBackgroundRoutePointKey(point) === cursor.key,
+        );
+        if (cursorIndex >= 0) {
+          firstNewPointIndex = cursorIndex + 1;
+        } else {
+          const newerPointIndex = snapshot.routePoints.findIndex(
+            (point) => point.recordedAtMs > cursor.recordedAtMs,
+          );
+          firstNewPointIndex =
+            newerPointIndex < 0
+              ? snapshot.routePoints.length
+              : newerPointIndex;
+        }
       }
 
       const newPoints = snapshot.routePoints
-        .slice(appliedBackgroundRouteCountRef.current)
+        .slice(firstNewPointIndex)
         .map((point) => ({
           latitude: point.latitude,
           longitude: point.longitude,
@@ -99,7 +124,13 @@ export function usePloggingTracker({
 
       if (newPoints.length > 0) {
         appendRoutePoints(newPoints);
-        appliedBackgroundRouteCountRef.current = snapshot.routePoints.length;
+        const lastPoint = snapshot.routePoints[snapshot.routePoints.length - 1];
+        if (lastPoint) {
+          appliedBackgroundRouteCursorRef.current = {
+            key: getBackgroundRoutePointKey(lastPoint),
+            recordedAtMs: lastPoint.recordedAtMs,
+          };
+        }
 
         if (!placeNameSetRef.current) {
           placeNameSetRef.current = true;
@@ -108,15 +139,25 @@ export function usePloggingTracker({
           });
         }
       }
+
+      const stepDelta =
+        snapshot.stepCount - appliedBackgroundStepCountRef.current;
+      if (stepDelta > 0) addSteps(stepDelta);
+      appliedBackgroundStepCountRef.current = Math.max(
+        appliedBackgroundStepCountRef.current,
+        snapshot.stepCount
+      );
     },
-    [appendRoutePoints, backgroundSessionId, setPlaceName]
+    [addSteps, appendRoutePoints, backgroundSessionId, setPlaceName]
   );
 
   useEffect(() => {
+    if (!enabled) return;
     return subscribeBackgroundPloggingSnapshot(applyBackgroundSnapshot);
-  }, [applyBackgroundSnapshot]);
+  }, [applyBackgroundSnapshot, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     const intervalId = setInterval(() => {
       readBackgroundPloggingSnapshot()
         .then(applyBackgroundSnapshot)
@@ -124,27 +165,34 @@ export function usePloggingTracker({
     }, 2_000);
 
     return () => clearInterval(intervalId);
-  }, [applyBackgroundSnapshot]);
+  }, [applyBackgroundSnapshot, enabled]);
 
   // 백그라운드 GPS 태스크를 우선 사용하고, 현재 실행 환경에서 불가능하면 기존 foreground watch로 폴백한다.
   useEffect(() => {
+    if (!enabled) return;
     let subscription: Location.LocationSubscription | null = null;
     let cancelled = false;
 
     (async () => {
       try {
         const backgroundResult = await startPloggingBackgroundLocation({
+          sessionId: backgroundSessionId,
           startedAtMs,
         });
         if (cancelled) return;
+
+        const currentSnapshot = await readBackgroundPloggingSnapshot().catch(
+          () => null
+        );
+        if (!cancelled && currentSnapshot) {
+          applyBackgroundSnapshot(currentSnapshot);
+        }
 
         if (backgroundResult.status === "started") {
           setLocationPermission("granted");
           setBackgroundLocationPermission("granted");
           setBackgroundTracking("running");
 
-          const snapshot = await readBackgroundPloggingSnapshot();
-          if (!cancelled) applyBackgroundSnapshot(snapshot);
           return;
         }
 
@@ -183,7 +231,13 @@ export function usePloggingTracker({
               latitude: event.coords.latitude,
               longitude: event.coords.longitude,
             };
-            appendRoutePoint(point);
+            void appendBackgroundPloggingLocations([
+              {
+                accuracy: event.coords.accuracy ?? null,
+                ...point,
+                recordedAtMs: event.timestamp,
+              },
+            ]);
 
             if (!placeNameSetRef.current) {
               placeNameSetRef.current = true;
@@ -213,18 +267,31 @@ export function usePloggingTracker({
       subscription?.remove();
       void stopPloggingBackgroundLocation();
     };
-  }, [appendRoutePoint, applyBackgroundSnapshot, setPlaceName, startedAtMs]);
+  }, [
+    applyBackgroundSnapshot,
+    backgroundSessionId,
+    enabled,
+    setPlaceName,
+    startedAtMs,
+  ]);
 
   useEffect(() => {
+    if (!enabled) return;
     void pausePloggingBackgroundLocation(isPaused);
-  }, [isPaused]);
+  }, [enabled, isPaused]);
 
   useEffect(() => {
+    if (!enabled) return;
+    appliedBackgroundStepCountRef.current = Math.max(
+      appliedBackgroundStepCountRef.current,
+      stepCount
+    );
     void setBackgroundPloggingStepCount(stepCount);
-  }, [stepCount]);
+  }, [enabled, stepCount]);
 
   // 만보기 가용성 + 권한 + 구독
   useEffect(() => {
+    if (!enabled) return;
     let subscription: ReturnType<typeof Pedometer.watchStepCount> | null = null;
     let cancelled = false;
 
@@ -272,6 +339,11 @@ export function usePloggingTracker({
           const observedSteps = toWholeStepCount(event.steps);
           if (observedSteps === null) return;
 
+          if (pedometerSyncInProgressRef.current) {
+            lastPedometerStepsRef.current = observedSteps;
+            return;
+          }
+
           const previousSteps = lastPedometerStepsRef.current;
           lastPedometerStepsRef.current = observedSteps;
 
@@ -315,12 +387,13 @@ export function usePloggingTracker({
       cancelled = true;
       subscription?.remove();
     };
-  }, [addSteps]);
+  }, [addSteps, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "background" || nextState === "inactive") {
-        appBackgroundedAtRef.current = Date.now();
+        appBackgroundedAtRef.current ??= Date.now();
         return;
       }
 
@@ -341,16 +414,26 @@ export function usePloggingTracker({
         return;
       }
 
-      syncPedometerSteps(backgroundedAt, Date.now(), addSteps).then((synced) => {
-        if (synced) {
+      pedometerSyncInProgressRef.current = true;
+      const syncUntil = Date.now();
+      syncPedometerSteps(backgroundedAt, syncUntil, addSteps)
+        .then((synced) => {
+          if (synced) {
+            lastPedometerStepsRef.current = null;
+            skipNextPedometerBaselineRef.current = true;
+          }
+        })
+        .finally(() => {
+          // 포그라운드 watch가 백그라운드 누적분을 다시 전달하더라도
+          // 동기화 구간을 중복 가산하지 않도록 새 기준점부터 재개한다.
           lastPedometerStepsRef.current = null;
           skipNextPedometerBaselineRef.current = true;
-        }
-      });
+          pedometerSyncInProgressRef.current = false;
+        });
     });
 
     return () => subscription.remove();
-  }, [addSteps, applyBackgroundSnapshot]);
+  }, [addSteps, applyBackgroundSnapshot, enabled]);
 
   return {
     backgroundLocationPermission,
@@ -359,6 +442,14 @@ export function usePloggingTracker({
     pedometerAvailable,
     pedometerPermission,
   };
+}
+
+function getBackgroundRoutePointKey(point: {
+  latitude: number;
+  longitude: number;
+  recordedAtMs: number;
+}): string {
+  return `${point.recordedAtMs}:${point.latitude}:${point.longitude}`;
 }
 
 async function syncPedometerSteps(

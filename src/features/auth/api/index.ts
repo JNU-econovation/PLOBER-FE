@@ -7,5 +7,4 @@ export type {
   AuthLoginResponse,
   KakaoLoginRequest,
   KakaoLoginResponse,
-  LogoutRequest,
 } from "./types";

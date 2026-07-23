@@ -6,11 +6,30 @@ export type UploadPloggingPhotoResult =
   | { status: "error"; message: string };
 
 const DEFAULT_CONTENT_TYPE: PhotoUploadContentType = "image/jpeg";
+const uploadTasks = new Map<string, Promise<UploadPloggingPhotoResult>>();
 
-export async function uploadPloggingPhoto(
+export function uploadPloggingPhoto(
   localUri: string,
-  userId: number,
   contentType: PhotoUploadContentType = DEFAULT_CONTENT_TYPE
+): Promise<UploadPloggingPhotoResult> {
+  const existingTask = uploadTasks.get(localUri);
+  if (existingTask) return existingTask;
+
+  const task = performPloggingPhotoUpload(localUri, contentType);
+  uploadTasks.set(localUri, task);
+  void task.then((result) => {
+    // 성공 결과는 리포트가 같은 URI로 조회할 수 있도록 유지하고,
+    // 실패는 다음 호출에서 재시도할 수 있도록 제거한다.
+    if (result.status === "error" && uploadTasks.get(localUri) === task) {
+      uploadTasks.delete(localUri);
+    }
+  });
+  return task;
+}
+
+async function performPloggingPhotoUpload(
+  localUri: string,
+  contentType: PhotoUploadContentType
 ): Promise<UploadPloggingPhotoResult> {
   try {
     if (__DEV__) {
@@ -21,7 +40,6 @@ export async function uploadPloggingPhoto(
 
     const { uploadUrl, objectUrl } = await getPhotoUploadUrl({
       contentType,
-      userId,
     });
 
     const fileResponse = await fetch(localUri);

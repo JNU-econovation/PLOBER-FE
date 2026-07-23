@@ -7,9 +7,8 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useMemo } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 
 import { useMonthlyPloggingSummary } from "../hooks/use-monthly-plogging-summary";
 import { usePloggingSessions } from "../hooks/use-plogging-sessions";
@@ -22,16 +21,11 @@ import type {
   WeeklyPloggingSummary,
 } from "../api/types";
 import {
-  MiniGlyph,
   ScreenRoot,
-  StatNumber,
   TopInset,
+  useTabBarHeight,
 } from "@/src/shared/ui";
-import { colors, shadows } from "@/src/shared/theme";
-
-// 모드별 색 구분이 확정되기 전까지 모든 항목에 동일한 초록 톤 mock 사용.
-const MOCK_GLYPH_COLOR = "#7BC47F";
-const MOCK_GLYPH_BACKGROUND = "#EFF7EF";
+import { colors, fontFamilies, shadows } from "@/src/shared/theme";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
@@ -58,11 +52,15 @@ const CHART_DAY_LABEL: Record<DayOfWeek, string> = {
 };
 
 export function HistoryScreen() {
-  const insets = useSafeAreaInsets();
+  const tabBarHeight = useTabBarHeight();
 
-  // 화면 mount 시점의 "지금"을 기준으로 한 번만 계산해 두면
-  // 훅의 의존성이 매 렌더마다 새 Date를 만들지 않아도 된다.
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useFocusEffect(
+    useCallback(() => {
+      // 앱을 자정·월/주 경계 너머까지 켜 둔 뒤 돌아와도 최신 기간을 조회한다.
+      setNow(new Date());
+    }, [])
+  );
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const weekStartDate = useMemo(() => getMondayDateString(now), [now]);
@@ -71,7 +69,7 @@ export function HistoryScreen() {
     <ScreenRoot>
       <ScrollView
         contentContainerStyle={{
-          paddingBottom: Math.max(insets.bottom, 24) + 118,
+          paddingBottom: tabBarHeight + 24,
         }}
         showsVerticalScrollIndicator={false}
       >
@@ -79,9 +77,6 @@ export function HistoryScreen() {
         <MonthlySummaryHero month={month} year={year} />
 
         <MonthlyChartCard month={month} weekStartDate={weekStartDate} />
-        <Text selectable style={styles.moreText}>
-          더보기 &gt;
-        </Text>
 
         <Text selectable style={styles.recentTitle}>
           최근 기록
@@ -97,36 +92,44 @@ function RecentRecordsSection() {
 
   if (state.status === "loading" || state.status === "idle") {
     return (
-      <View style={[styles.recordCard, styles.recordPlaceholder]}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={styles.recordsList}>
+        <View style={[styles.recordCard, styles.recordPlaceholder]}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       </View>
     );
   }
 
   if (state.status === "error") {
     return (
-      <View style={[styles.recordCard, styles.recordPlaceholder]}>
-        <Text selectable style={styles.recordPlaceholderText}>
-          {state.message}
-        </Text>
+      <View style={styles.recordsList}>
+        <View style={[styles.recordCard, styles.recordPlaceholder]}>
+          <Text selectable style={styles.recordPlaceholderText}>
+            {state.message}
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (state.sessions.length === 0) {
     return (
-      <View style={[styles.recordCard, styles.recordPlaceholder]}>
-        <Text selectable style={styles.recordPlaceholderText}>
-          아직 플로깅 기록이 없습니다.
-        </Text>
+      <View style={styles.recordsList}>
+        <View style={[styles.recordCard, styles.recordPlaceholder]}>
+          <Text selectable style={styles.recordPlaceholderText}>
+            아직 플로깅 기록이 없습니다.
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.recordCard}>
+    <View style={styles.recordsList}>
       {state.sessions.map((session) => (
-        <RecordRow key={session.ploggingSessionId} session={session} />
+        <View key={session.ploggingSessionId} style={styles.recordCard}>
+          <RecordRow session={session} />
+        </View>
       ))}
     </View>
   );
@@ -143,9 +146,9 @@ function MonthlySummaryHero({
 
   return (
     <LinearGradient
-      colors={["#72BDF3", "#449DDD"]}
-      end={{ x: 1, y: 0.5 }}
-      start={{ x: 0, y: 0.5 }}
+      colors={["#8DC3EC", "#449DDD"]}
+      end={{ x: 0.9, y: 0.9 }}
+      start={{ x: 0.1, y: 0.1 }}
       style={styles.summaryHero}
     >
       <Text selectable style={styles.monthLabel}>
@@ -233,6 +236,9 @@ function SummaryMetric({
 }) {
   return (
     <View style={styles.heroMetric}>
+      <Text numberOfLines={1} selectable style={styles.heroCaption}>
+        {caption}
+      </Text>
       <Text
         adjustsFontSizeToFit
         minimumFontScale={0.7}
@@ -241,9 +247,6 @@ function SummaryMetric({
         style={styles.heroValue}
       >
         {value} <Text style={styles.heroUnit}>{unit}</Text>
-      </Text>
-      <Text numberOfLines={1} selectable style={styles.heroCaption}>
-        {caption}
       </Text>
     </View>
   );
@@ -264,7 +267,7 @@ function MonthlyChartCard({
     <View style={styles.chartCard}>
       <View style={styles.chartHeader}>
         <Text selectable style={styles.sectionTitle}>
-          이번 달 누적
+          이번 주 누적
         </Text>
         <Text selectable style={styles.dateRange}>
           {formatWeekRangeLabel(state, month)}
@@ -337,7 +340,7 @@ function RecordRow({ session }: { session: PloggingSessionSummary }) {
         pressed ? styles.recordRowPressed : null,
       ]}
     >
-      <MiniGlyph background={MOCK_GLYPH_BACKGROUND} color={MOCK_GLYPH_COLOR} />
+      <View style={styles.recordGlyph} />
       <View style={styles.recordCopy}>
         <Text selectable style={styles.recordPlace}>
           {session.placeName}
@@ -346,13 +349,10 @@ function RecordRow({ session }: { session: PloggingSessionSummary }) {
           {formatSessionTimeRange(session.startedAt, session.finishedAt)}
         </Text>
       </View>
-      <View style={styles.recordDistance}>
-        <StatNumber
-          size={18}
-          unit="km"
-          value={formatKilometers(session.distanceMeters)}
-        />
-      </View>
+      <Text selectable style={styles.recordDistanceValue}>
+        {formatKilometers(session.distanceMeters)}
+        <Text style={styles.recordDistanceUnit}> km</Text>
+      </Text>
     </Pressable>
   );
 }
@@ -467,7 +467,12 @@ function buildWeeklyBars(summary: WeeklyPloggingSummary): WeeklyBar[] {
     return {
       day: CHART_DAY_LABEL[day],
       height,
-      color: isMax ? colors.primaryDark : colors.primary,
+      color:
+        isMax
+          ? colors.primary
+          : ratio >= 0.7
+            ? colors.primarySoft
+            : "#C3DEF4",
     };
   });
 }
@@ -475,32 +480,36 @@ function buildWeeklyBars(summary: WeeklyPloggingSummary): WeeklyBar[] {
 const styles = StyleSheet.create({
   bar: {
     borderRadius: 6,
-    width: 38,
+    maxWidth: 28,
+    minWidth: 8,
+    width: "70%",
   },
   barItem: {
     alignItems: "center",
+    flex: 1,
     gap: 8,
     height: 87,
     justifyContent: "flex-end",
   },
   barLabel: {
-    color: "#596C59",
+    color: "#404040",
+    fontFamily: fontFamilies.medium,
     fontSize: 12,
-    fontWeight: "500",
+    letterSpacing: -0.24,
   },
   bars: {
     alignItems: "flex-end",
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     justifyContent: "space-between",
     marginTop: 20,
   },
   chartCard: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
+    borderRadius: 12,
+    height: 157,
     marginHorizontal: 24,
-    marginTop: 30,
-    minHeight: 157,
+    marginTop: 21,
     paddingHorizontal: 21,
     paddingTop: 22,
     ...shadows.soft,
@@ -517,27 +526,28 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   dateRange: {
-    color: "#596C59",
+    color: "#1B6CAE",
+    fontFamily: fontFamilies.medium,
     fontSize: 12,
-    fontWeight: "500",
+    letterSpacing: -0.24,
   },
   heroCaption: {
     color: colors.surface,
-    fontSize: 11,
-    fontWeight: "500",
-    letterSpacing: 0,
-    marginTop: 5,
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    letterSpacing: -0.24,
+    marginBottom: 4,
   },
   heroErrorText: {
     color: colors.surface,
+    fontFamily: fontFamilies.medium,
     fontSize: 13,
-    fontWeight: "500",
     textAlign: "center",
   },
   heroLine: {
     backgroundColor: "rgba(255, 255, 255, 0.75)",
     height: 1,
-    marginTop: 10,
+    marginTop: 13,
   },
   heroLoading: {
     alignItems: "center",
@@ -552,45 +562,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: 12,
   },
   heroUnit: {
+    fontFamily: fontFamilies.medium,
     fontSize: 14,
-    fontWeight: "500",
   },
   heroValue: {
     color: colors.surface,
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: 0,
+    fontFamily: fontFamilies.bold,
+    fontSize: 22,
+    letterSpacing: -0.44,
   },
   monthLabel: {
     color: colors.surface,
+    fontFamily: fontFamilies.medium,
     fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: 0,
-  },
-  moreText: {
-    alignSelf: "flex-end",
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: "700",
-    marginRight: 25,
-    marginTop: 14,
+    letterSpacing: -0.32,
   },
   recentTitle: {
-    color: colors.text,
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.medium,
     fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: 0,
+    letterSpacing: -0.32,
     marginLeft: 24,
-    marginTop: 22,
+    marginTop: 33,
   },
   recordCard: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
-    marginHorizontal: 24,
-    marginTop: 12,
+    borderRadius: 12,
+    height: 77,
     overflow: "hidden",
     ...shadows.soft,
   },
@@ -607,59 +608,80 @@ const styles = StyleSheet.create({
   },
   recordPlaceholderText: {
     color: colors.muted,
+    fontFamily: fontFamilies.medium,
     fontSize: 13,
-    fontWeight: "500",
     textAlign: "center",
   },
-  recordDistance: {
-    alignItems: "flex-end",
-    minWidth: 70,
+  recordDistanceUnit: {
+    color: "#121212",
+    fontFamily: fontFamilies.giantsRegular,
+    fontSize: 10,
+    letterSpacing: -0.2,
+  },
+  recordDistanceValue: {
+    color: "#121212",
+    fontFamily: fontFamilies.giantsRegular,
+    fontSize: 16,
+    letterSpacing: 0.64,
+    minWidth: 72,
+    textAlign: "right",
+  },
+  recordGlyph: {
+    backgroundColor: "#F5F5F5",
+    borderRadius: 12,
+    height: 45,
+    width: 45,
   },
   recordPlace: {
-    color: colors.text,
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.semiBold,
     fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0,
+    letterSpacing: -0.32,
   },
   recordRow: {
     alignItems: "center",
-    borderBottomColor: colors.line,
-    borderBottomWidth: 1,
     flexDirection: "row",
     gap: 15,
-    minHeight: 77,
+    height: 77,
     paddingHorizontal: 16,
   },
   recordRowPressed: {
     opacity: 0.7,
   },
   recordTime: {
-    color: "#616161",
+    color: "#737373",
+    fontFamily: fontFamilies.medium,
     fontSize: 13,
-    fontWeight: "500",
+  },
+  recordsList: {
+    gap: 12,
+    marginHorizontal: 24,
+    marginTop: 12,
   },
   sectionTitle: {
-    color: colors.text,
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.medium,
     fontSize: 14,
-    fontWeight: "600",
+    letterSpacing: -0.28,
   },
   summaryHero: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingBottom: 24,
-    paddingHorizontal: 40,
-    paddingTop: 32,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    height: 264,
+    paddingHorizontal: 24,
+    paddingTop: 74,
     ...shadows.soft,
   },
   totalSteps: {
     color: colors.surface,
+    fontFamily: fontFamilies.bold,
     fontSize: 36,
-    fontWeight: "800",
-    letterSpacing: 0,
+    letterSpacing: -0.72,
     marginTop: 8,
   },
   totalUnit: {
+    fontFamily: fontFamilies.medium,
     fontSize: 16,
-    fontWeight: "500",
+    letterSpacing: -0.32,
   },
 });

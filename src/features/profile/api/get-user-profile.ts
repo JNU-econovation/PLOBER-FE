@@ -4,10 +4,8 @@ import type { UserProfile } from "./types";
 
 const MY_PROFILE_PATH = "/api/users/me";
 
-export async function getUserProfile(userId: number): Promise<UserProfile> {
-  const response = await apiClient.get<UserProfile>(MY_PROFILE_PATH, {
-    params: { userId },
-  });
+export async function getUserProfile(): Promise<UserProfile> {
+  const response = await apiClient.get<UserProfile>(MY_PROFILE_PATH);
 
   if (__DEV__) {
     console.log(

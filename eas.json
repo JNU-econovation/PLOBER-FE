@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "channel": "development",
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
@@ -12,16 +13,30 @@
       }
     },
     "preview": {
+      "channel": "preview",
       "distribution": "internal",
+      "environment": "production",
       "ios": {
         "resourceClass": "m-medium"
       }
     },
+    "staging": {
+      "extends": "production",
+      "autoIncrement": false,
+      "channel": "staging",
+      "environment": "production"
+    },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
+      "environment": "production",
       "ios": {
         "resourceClass": "m-medium"
       }
+    },
+    "local-production": {
+      "extends": "production",
+      "autoIncrement": false
     }
   },
   "submit": {

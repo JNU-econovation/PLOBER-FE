@@ -26,10 +26,6 @@ import {
   getHotspotOutlineColor,
   getHotspotOutlineWidth,
 } from "../services/hotspot-tiles";
-import {
-  buildRouteGuideMarkers,
-  type RouteGuideMarkers,
-} from "../services/route-guides";
 import { HeatmapLegend } from "./heatmap-legend";
 import type { PloggingMapProps } from "./types";
 
@@ -58,6 +54,29 @@ type MapCoord = {
   longitude: number;
 };
 
+// 지도 전체를 덮는 내부 디밍 레이어. 경도 180도 경계를 한 폴리곤으로
+// 가로지르면 SDK가 짧은 쪽으로 접을 수 있어 동/서반구를 나눠 그린다.
+// React Native View로 지도를 덮으면 경로선까지 흐려지므로, 지도 심벌 위이자
+// 경로선 아래인 global z-index에 반투명 폴리곤을 그린다.
+const DIMMED_MAP_REGIONS: MapCoord[][] = [
+  [
+    { latitude: 85, longitude: -179.9 },
+    { latitude: 85, longitude: 0.1 },
+    { latitude: -85, longitude: 0.1 },
+    { latitude: -85, longitude: -179.9 },
+  ],
+  [
+    { latitude: 85, longitude: -0.1 },
+    { latitude: 85, longitude: 179.9 },
+    { latitude: -85, longitude: 179.9 },
+    { latitude: -85, longitude: -0.1 },
+  ],
+];
+const DIMMED_MAP_GLOBAL_Z_INDEX = 1;
+const ROUTE_GLOBAL_Z_INDEX = 2;
+const DIMMED_MAP_COLOR = "rgba(255, 255, 255, 0.50)";
+const DIMMED_HEATMAP_COLOR = "rgba(255, 255, 255, 0.18)";
+
 export function PloggingMap({
   children,
   routeVisible = false,
@@ -69,6 +88,7 @@ export function PloggingMap({
   style,
   zoom,
   followUserLocation = true,
+  recenterRequestId,
   trashBins,
   toilets,
 }: PloggingMapProps) {
@@ -80,10 +100,6 @@ export function PloggingMap({
   const [cameraZoom, setCameraZoom] = useState(initialZoom);
   const visibleRoutePoints =
     routePoints && routePoints.length >= 2 ? routePoints : ROUTE_COORDS;
-  const routeGuides = useMemo(
-    () => buildRouteGuideMarkers(visibleRoutePoints),
-    [visibleRoutePoints]
-  );
   const facilityMarkerAlpha = getFacilityMarkerAlpha(cameraZoom);
 
   // 최초 카메라는 실제 위치를 우선하고, 위치 권한이 막힌 경우에만 전국 fallback을 쓴다.
@@ -102,6 +118,7 @@ export function PloggingMap({
     latitude: number;
     longitude: number;
   } | null>(null);
+  const lastRecenterRequestIdRef = useRef(recenterRequestId);
   // 카메라 점프 검증용(>100m 이동 시만 로그).
   const lastCameraLogRef = useRef<{
     latitude: number;
@@ -136,8 +153,10 @@ export function PloggingMap({
     ) {
       return;
     }
+    const recenterRequested =
+      recenterRequestId !== lastRecenterRequestIdRef.current;
     const prev = lastAnimatedRef.current;
-    if (prev) {
+    if (prev && !recenterRequested) {
       const dLat = Math.abs(positionLatitude - prev.latitude);
       const dLng = Math.abs(positionLongitude - prev.longitude);
       if (dLat < CAMERA_ANIMATE_THRESHOLD && dLng < CAMERA_ANIMATE_THRESHOLD) {
@@ -157,7 +176,13 @@ export function PloggingMap({
       latitude: positionLatitude,
       longitude: positionLongitude,
     };
-  }, [followUserLocation, positionLatitude, positionLongitude]);
+    lastRecenterRequestIdRef.current = recenterRequestId;
+  }, [
+    followUserLocation,
+    positionLatitude,
+    positionLongitude,
+    recenterRequestId,
+  ]);
 
   const handleInitialized = () => {
     if (__DEV__) {
@@ -270,16 +295,26 @@ export function PloggingMap({
                 />
               ))
             : null}
+          {dimmed && routeVisible
+            ? DIMMED_MAP_REGIONS.map((coords, index) => (
+                <NaverMapPolygonOverlay
+                  color={
+                    heatmapVisible ? DIMMED_HEATMAP_COLOR : DIMMED_MAP_COLOR
+                  }
+                  coords={coords}
+                  globalZIndex={DIMMED_MAP_GLOBAL_Z_INDEX}
+                  key={`map-dim-${index}`}
+                  outlineWidth={0}
+                />
+              ))
+            : null}
           {routeVisible ? (
-            <>
-              <NaverMapPolylineOverlay
-                color={colors.primaryDark}
-                coords={visibleRoutePoints}
-                zIndex={2}
-                width={9}
-              />
-              <RouteGuideOverlays guides={routeGuides} />
-            </>
+            <NaverMapPolylineOverlay
+              color={colors.primary}
+              coords={visibleRoutePoints}
+              globalZIndex={ROUTE_GLOBAL_Z_INDEX}
+              width={6}
+            />
           ) : null}
           {trashBins?.map((bin) => (
             <NaverMapMarkerOverlay
@@ -325,7 +360,7 @@ export function PloggingMap({
           ))}
         </NaverMapView>
       )}
-      {dimmed ? (
+      {dimmed && !routeVisible ? (
         <View style={[styles.dimmed, heatmapVisible ? styles.dimmedHeatmap : null]} />
       ) : null}
       {heatmapLegendVisible ? <HeatmapLegend top={heatmapLegendTop} /> : null}
@@ -378,35 +413,6 @@ function TrashCanFacilityIcon({ cutoutColor }: { cutoutColor: string }) {
   );
 }
 
-function RouteGuideOverlays({ guides }: { guides: RouteGuideMarkers }) {
-  return (
-    <>
-      {guides.arrows.map((marker) => (
-        <NaverMapMarkerOverlay
-          key={marker.id}
-          anchor={{ x: 0.5, y: 0.5 }}
-          angle={marker.bearing}
-          height={16}
-          isFlatEnabled
-          isForceShowIcon
-          latitude={marker.latitude}
-          longitude={marker.longitude}
-          width={16}
-          zIndex={3}
-        >
-          <View
-            key={`${marker.id}-${Math.round(marker.bearing)}`}
-            collapsable={false}
-            style={styles.routeArrowMarker}
-          >
-            <View style={styles.routeArrowHead} />
-          </View>
-        </NaverMapMarkerOverlay>
-      ))}
-    </>
-  );
-}
-
 function getFacilityMarkerAlpha(zoomLevel: number): number {
   if (zoomLevel <= FACILITY_MARKER_HIDE_ZOOM) return 0;
   if (zoomLevel >= FACILITY_MARKER_FULL_ZOOM) return 1;
@@ -430,11 +436,11 @@ const styles = StyleSheet.create({
   },
   dimmed: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255, 255, 255, 0.50)",
+    backgroundColor: DIMMED_MAP_COLOR,
     pointerEvents: "none",
   },
   dimmedHeatmap: {
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    backgroundColor: DIMMED_HEATMAP_COLOR,
   },
   facilityMarker: {
     alignItems: "center",
@@ -501,23 +507,5 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     height: 7,
     width: 2,
-  },
-  routeArrowHead: {
-    borderBottomColor: colors.surface,
-    borderBottomWidth: 10,
-    borderLeftColor: "transparent",
-    borderLeftWidth: 4,
-    borderRightColor: "transparent",
-    borderRightWidth: 4,
-    height: 0,
-    width: 0,
-  },
-  routeArrowMarker: {
-    alignItems: "center",
-    backgroundColor: "transparent",
-    height: 16,
-    justifyContent: "center",
-    opacity: 0.92,
-    width: 16,
   },
 });
