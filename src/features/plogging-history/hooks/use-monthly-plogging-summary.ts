@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 
 import { useAuthSession } from "@/src/features/auth";
 
@@ -27,35 +28,37 @@ export function useMonthlyPloggingSummary({
     status: "idle",
   });
 
-  useEffect(() => {
-    if (authStatus !== "authenticated" || !session?.userId) {
-      setState({ status: "idle" });
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      if (authStatus !== "authenticated" || !session?.userId) {
+        setState({ status: "idle" });
+        return;
+      }
 
-    let mounted = true;
-    setState({ status: "loading" });
+      let mounted = true;
+      setState({ status: "loading" });
 
-    getMonthlyPloggingSummary({ month, userId: session.userId, year })
-      .then((summary) => {
-        if (!mounted) return;
-        setState({ status: "success", summary });
-      })
-      .catch((error) => {
-        if (!mounted) return;
-        setState({
-          status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "월간 누적 정보를 불러오지 못했습니다.",
+      getMonthlyPloggingSummary({ month, year })
+        .then((summary) => {
+          if (!mounted) return;
+          setState({ status: "success", summary });
+        })
+        .catch((error) => {
+          if (!mounted) return;
+          setState({
+            status: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "월간 누적 정보를 불러오지 못했습니다.",
+          });
         });
-      });
 
-    return () => {
-      mounted = false;
-    };
-  }, [authStatus, month, session?.userId, year]);
+      return () => {
+        mounted = false;
+      };
+    }, [authStatus, month, session?.userId, year]),
+  );
 
   return state;
 }

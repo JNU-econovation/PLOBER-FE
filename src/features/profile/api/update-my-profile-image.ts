@@ -8,12 +8,11 @@ import type {
 const MY_PROFILE_IMAGE_PATH = "/api/users/me/profile-image";
 
 export async function updateMyProfileImage(
-  { imageUrl, userId }: UpdateMyProfileImageRequest
+  { imageUrl }: UpdateMyProfileImageRequest
 ): Promise<UpdateMyProfileImageResponse> {
   const response = await apiClient.put<UpdateMyProfileImageResponse>(
     MY_PROFILE_IMAGE_PATH,
-    { imageUrl },
-    { params: { userId } }
+    { imageUrl }
   );
   return response.data;
 }

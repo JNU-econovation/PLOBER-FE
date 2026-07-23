@@ -43,6 +43,11 @@ export type PloggingMapProps = PropsWithChildren<{
    */
   followUserLocation?: boolean;
   /**
+   * Increment this value to move the native map camera back to the user's
+   * current location, even when the location coordinates have not changed.
+   */
+  recenterRequestId?: number;
+  /**
    * Trash bin markers to render on the map. Mock maps ignore this prop.
    */
   trashBins?: TrashBinMarker[];

@@ -9,28 +9,28 @@ export type CompletePloggingSessionRequest = {
   mode: PloggingMode;
   startedAt: string;
   finishedAt: string;
-  distanceMeters: number;
-  stepCount: number;
-  caloriesBurned: number;
-  ploggingSeconds: number;
-  restSeconds: number;
-  placeName: string;
+  distanceMeters?: number;
+  stepCount?: number;
+  caloriesBurned?: number;
+  ploggingSeconds?: number;
+  restSeconds?: number;
+  placeName?: string;
   startLatitude: number;
   startLongitude: number;
   endLatitude: number;
   endLongitude: number;
   routePoints: RoutePoint[];
-  mapImageUrl: string;
+  mapImageUrl?: string;
   photoUrls: string[];
-};
-
-export type CompletePloggingSessionParams = {
-  payload: CompletePloggingSessionRequest;
-  userId: number;
+  crewPloggingSessionId?: number | null;
 };
 
 export type CompletePloggingSessionResponse = {
   ploggingSessionId: number;
+  previousExperience: number;
+  currentExperience: number;
+  previousLevel: number;
+  currentLevel: number;
 };
 
 export type MapImageUploadContentType =
@@ -43,7 +43,6 @@ export type MapImageUploadContentType =
 
 export type GetMapImageUploadUrlRequest = {
   contentType: MapImageUploadContentType;
-  userId: number;
 };
 
 export type GetMapImageUploadUrlResponse = {
@@ -61,7 +60,6 @@ export type PhotoUploadContentType =
 
 export type GetPhotoUploadUrlRequest = {
   contentType: PhotoUploadContentType;
-  userId: number;
 };
 
 export type GetPhotoUploadUrlResponse = {

@@ -34,7 +34,6 @@ export function usePloggingSessionDetail(
 
     getPloggingSession({
       ploggingSessionId,
-      userId: session.userId,
     })
       .then((detail) => {
         if (!mounted) return;

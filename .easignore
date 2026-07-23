@@ -1,0 +1,41 @@
+# Dependencies and generated Expo output
+node_modules/
+.expo/
+builds/
+dist/
+web-build/
+expo-env.d.ts
+
+# Local and secret material
+/.env*
+!/.env.example
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+credentials.json
+plover-upload-key.keystore
+
+# Native build output. The checked-in workspace state under ios/ is intentionally
+# included because it contains the custom Live Activity extension.
+/android/
+/ios/Pods/
+/ios/build/
+/ios/com.econovation.plover/
+/ios/**/xcuserdata/
+/ios/.xcode.env.local
+*.xcuserstate
+.kotlin/
+
+# Tooling and OS noise
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo
+.DS_Store
+*.orig.*
+app-example/

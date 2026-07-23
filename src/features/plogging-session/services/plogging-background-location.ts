@@ -4,6 +4,8 @@ import * as Location from "expo-location";
 import "./plogging-background-location-task";
 import {
   PLOGGING_LOCATION_TASK_NAME,
+  isBackgroundPloggingSnapshotForSession,
+  readBackgroundPloggingSnapshot,
   resetBackgroundPloggingSession,
   setBackgroundPloggingPaused,
   stopBackgroundPloggingSession,
@@ -20,8 +22,10 @@ const BACKGROUND_PERMISSION_MESSAGE =
 type TaskManagerModule = typeof import("expo-task-manager");
 
 export async function startPloggingBackgroundLocation({
+  sessionId,
   startedAtMs,
 }: {
+  sessionId?: string;
   startedAtMs: number;
 }): Promise<BackgroundTrackingStartResult> {
   const foreground = await ensureForegroundPermission();
@@ -30,6 +34,24 @@ export async function startPloggingBackgroundLocation({
       status: "denied",
       message: "위치 권한이 없어 플로깅 경로를 기록할 수 없습니다.",
     };
+  }
+
+  const backgroundSessionId = sessionId ?? String(startedAtMs);
+  const existingSnapshot = await readBackgroundPloggingSnapshot().catch(
+    () => null
+  );
+  const resumingExistingSession =
+    existingSnapshot !== null &&
+    isBackgroundPloggingSnapshotForSession(
+      existingSnapshot,
+      backgroundSessionId
+    );
+
+  if (!resumingExistingSession) {
+    await resetBackgroundPloggingSession({
+      sessionId: backgroundSessionId,
+      startedAtMs,
+    });
   }
 
   if (Platform.OS === "android") {
@@ -67,14 +89,12 @@ export async function startPloggingBackgroundLocation({
     };
   }
 
-  await resetBackgroundPloggingSession({
-    sessionId: String(startedAtMs),
-    startedAtMs,
-  });
-
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
     PLOGGING_LOCATION_TASK_NAME
   );
+  if (alreadyStarted && resumingExistingSession) {
+    return { status: "started" };
+  }
   if (alreadyStarted) {
     await Location.stopLocationUpdatesAsync(PLOGGING_LOCATION_TASK_NAME);
   }

@@ -16,7 +16,3 @@ export type AuthLoginResponse = {
 
 export type KakaoLoginResponse = AuthLoginResponse;
 export type AppleLoginResponse = AuthLoginResponse;
-
-export type LogoutRequest = {
-  userId: number;
-};

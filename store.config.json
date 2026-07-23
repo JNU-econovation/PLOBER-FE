@@ -1,0 +1,62 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "version": "1.0.1",
+    "release": {
+      "automaticRelease": false
+    },
+    "info": {
+      "ko": {
+        "description": "걷는 시간이 깨끗한 동네를 만드는 시간이 되도록.\n플로버는 혼자 또는 크루와 함께 플로깅하고, 이동 경로와 활동을 기록하는 앱입니다.\n\n혼자 플로깅하기\n• 자유 모드로 원하는 길을 걸으며 플로깅할 수 있습니다.\n• 원하는 활동 시간에 맞는 AI 추천 경로를 선택할 수 있습니다.\n• 지도에서 현재 위치와 이동 경로를 확인할 수 있습니다.\n• 플로깅 시간, 거리, 걸음 수와 칼로리를 기록합니다.\n• 주변 쓰레기통과 화장실을 지도에서 확인할 수 있습니다.\n• 활동 중 인증 사진을 촬영하고 쓰레기 사진을 제보할 수 있습니다.\n\n크루와 같이줍기\n• 새로운 크루를 만들거나 6자리 초대넘버로 가입할 수 있습니다.\n• 크루원 프로필과 크루의 누적 플로깅 통계를 확인할 수 있습니다.\n• 크루장이 참여자를 모집하고 같이줍기를 시작할 수 있습니다.\n• 크루장이 전체 종료를 선택하면 참여 중인 모든 크루원의 활동이 함께 종료됩니다.\n• 각 참여자가 자신의 경로, 활동 기록과 선택한 사진을 제출하면 함께한 기록에서 결과를 확인할 수 있습니다.\n• 같이줍기 기록과 인증 사진을 사진 앱에 저장하거나 공유할 수 있습니다.\n\n기록 돌아보기\n• 완료한 플로깅의 경로, 시간, 거리, 걸음 수와 인증 사진을 확인할 수 있습니다.\n• 월별 활동과 누적 통계로 플로깅 기록을 돌아볼 수 있습니다.\n• 완성된 리포트 이미지를 사진 앱에 저장하거나 공유할 수 있습니다.\n\n플로버는 플로깅 경로와 활동 정보를 기록하기 위해 위치 및 동작·피트니스 권한을 사용할 수 있습니다. 인증 사진 촬영, 쓰레기 제보, 프로필 이미지 선택과 리포트 저장 기능에는 카메라 및 사진 접근 권한이 필요합니다. 플로깅 중 백그라운드 위치 권한을 허용하면 화면이 꺼져 있거나 다른 앱을 사용하는 동안에도 이동 경로를 계속 기록할 수 있습니다.\n\n플로버와 함께 일상 속 걸음을 더 깨끗한 동네를 만드는 활동으로 이어가 보세요.",
+        "keywords": [
+          "플로깅",
+          "같이줍깅",
+          "쓰레기줍기",
+          "걷기운동",
+          "산책길",
+          "크루활동",
+          "만보기",
+          "경로추천"
+        ],
+        "promoText": "혼자서도, 크루와 함께도 플로깅을 즐겨보세요. 자유 플로깅과 AI 추천 경로, 이동·걸음 기록, 주변 시설, 인증 사진과 같이줍기 기록까지 플로버에서 한 번에 관리할 수 있어요.",
+        "releaseNotes": "크루와 함께하는 같이줍기 기능이 새로 추가되었습니다.\n\n• 크루 생성 및 6자리 초대번호 가입\n• 모집부터 함께 시작·종료, 개인 기록 제출까지 연결\n• 크루별 누적 통계와 함께한 기록 확인\n• 같이줍기 결과와 인증 사진 저장 및 공유\n• 개인 플로깅 기록과 리포트 화면 개선",
+        "supportUrl": "https://separate-jacket-0a0.notion.site/36ddf9b47f808025b92bee9aa5b4e226?pvs=73",
+        "title": "플로버",
+        "subtitle": "함께 걷고 줍는 플로깅 기록 앱",
+        "privacyPolicyUrl": "https://separate-jacket-0a0.notion.site/36ddf9b47f80807aa8b2ce118dc0b911?source=copy_link"
+      }
+    },
+    "categories": [
+      "HEALTH_AND_FITNESS"
+    ],
+    "advisory": {
+      "ageRatingOverride": "NONE",
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "koreaAgeRatingOverride": "NONE",
+      "lootBox": false,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "advertising": false,
+      "ageAssurance": false,
+      "ageRatingOverrideV2": "NONE",
+      "developerAgeRatingInfoUrl": null,
+      "gunsOrOtherWeapons": "NONE",
+      "healthOrWellnessTopics": true,
+      "messagingAndChat": false,
+      "parentalControls": false,
+      "userGeneratedContent": true
+    }
+  }
+}

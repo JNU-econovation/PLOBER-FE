@@ -11,11 +11,10 @@ export async function getPloggingSessions({
   page,
   size,
   sort,
-  userId,
 }: GetPloggingSessionsRequest): Promise<GetPloggingSessionsResponse> {
   const response = await apiClient.get<GetPloggingSessionsResponse>(
     PLOGGING_SESSIONS_PATH,
-    { params: { page, size, sort, userId } }
+    { params: { page, size, sort } }
   );
   return response.data;
 }

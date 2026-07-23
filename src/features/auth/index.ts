@@ -21,6 +21,5 @@ export type {
   AuthLoginResponse,
   KakaoLoginRequest,
   KakaoLoginResponse,
-  LogoutRequest,
 } from "./api";
 export type { AuthSession } from "./services/session";

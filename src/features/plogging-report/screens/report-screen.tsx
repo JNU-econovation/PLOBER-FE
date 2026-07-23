@@ -1,10 +1,12 @@
-import { colors, shadows } from "@/src/shared/theme";
 import {
-  PrimaryBottomButton,
-  ScreenRoot,
-  StatNumber,
-} from "@/src/shared/ui";
-import { Feather } from "@expo/vector-icons";
+  colors,
+  fontFamilies,
+  getSafeLineHeight,
+  shadows,
+} from "@/src/shared/theme";
+import { PrimaryBottomButton, ScreenRoot } from "@/src/shared/ui";
+import { Image as ExpoImage } from "expo-image";
+import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
@@ -12,36 +14,63 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   BackHandler,
-  Easing,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef } from "react-native-view-shot";
 
 import { useAuthSession } from "@/src/features/auth";
+import { getCrewPloggingSession } from "@/src/features/crew/api";
+import {
+  CrewPhotoComposer,
+  ReportShareSheet,
+} from "@/src/features/crew/components/crew-report-overlays";
+import type { CrewPloggingRouteContext } from "@/src/features/crew/model";
+import type { CrewPloggingRecordDetail } from "@/src/features/crew/types";
+import { getUserProfile, type UserProfile } from "@/src/features/profile/api";
 import { completePloggingSession } from "@/src/features/plogging-session/api/complete-plogging-session";
 import type { CompletePloggingSessionRequest } from "@/src/features/plogging-session/api/types";
 import { usePloggingSession } from "@/src/features/plogging-session/hooks/use-plogging-session";
 import { uploadMapImage } from "@/src/features/plogging-session/services/upload-map-image";
+import { uploadPloggingPhoto } from "@/src/features/plogging-session/services/upload-plogging-photo";
+import { ApiError } from "@/src/shared/api";
+import { useDeviceLocation } from "@/src/shared/location";
 
+import {
+  PersonalReportPoster,
+  type PersonalReportPosterData,
+} from "../components/personal-report-poster";
+import { PersonalReportShareSheet } from "../components/personal-report-share-sheet";
 import { RouteSnapshotMap } from "../components/route-snapshot-map";
 import type { ReportMetric } from "../data/report-data";
 
 const PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT = 70;
-const FLOATING_SHARE_BUTTON_GAP = 18;
-const FLOATING_SHARE_BUTTON_HEIGHT = 43;
+const FLOATING_SHARE_BUTTON_GAP = 16;
+const FLOATING_SHARE_BUTTON_HEIGHT = 46;
 const FLOATING_SHARE_BUTTON_SCROLL_GAP = 24;
-const FLOATING_SHARE_BUTTON_BOB_DISTANCE = 5;
-const SHARE_PREVIEW_WIDTH = 390;
+const REPORT_CONTENT_HORIZONTAL_PADDING = 24;
+const REPORT_PHOTO_GAP = 8;
+const REPORT_PHOTO_MAX_WIDTH = 91;
+const REPORT_PHOTO_ASPECT_RATIO = 91 / 105;
+
+const reportIcons = {
+  back: require("@/assets/icons/figma-route-back.svg"),
+  crewAdd: require("@/assets/icons/crew-cta-plus.svg"),
+  photoClose: require("@/assets/icons/figma-photo-close.svg"),
+  photoSave: require("@/assets/icons/figma-photo-save.svg"),
+  reportSave: require("@/assets/icons/figma-report-save.svg"),
+  share: require("@/assets/icons/crew-share.svg"),
+} as const;
 
 type MapImageCaptureState = "idle" | "capturing" | "captured" | "error";
 type MediaLibraryModule = typeof import("expo-media-library");
@@ -65,10 +94,6 @@ function formatHm(ms: number | null): string {
 
 function formatKilometers(meters: number): string {
   return (meters / 1000).toFixed(1);
-}
-
-function formatKilometersForRecord(meters: number): string {
-  return (meters / 1000).toFixed(2);
 }
 
 function formatInteger(value: number): string {
@@ -111,6 +136,76 @@ function getRouteSignature(
     minLng.toFixed(6),
     maxLng.toFixed(6),
   ].join(":");
+}
+
+function buildRouteOverlaySvgUri(
+  points: { latitude: number; longitude: number }[]
+): string | null {
+  const validPoints = points.filter(
+    (point) =>
+      Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
+  );
+  if (validPoints.length < 2) return null;
+
+  const maxRenderedPoints = 500;
+  const renderedPoints =
+    validPoints.length <= maxRenderedPoints
+      ? validPoints
+      : Array.from({ length: maxRenderedPoints }, (_, index) =>
+          validPoints[
+            Math.round(
+              (index * (validPoints.length - 1)) / (maxRenderedPoints - 1)
+            )
+          ]
+        );
+  const viewWidth = 192;
+  const viewHeight = 164;
+  const padding = 12;
+  const averageLatitude =
+    renderedPoints.reduce((sum, point) => sum + point.latitude, 0) /
+    renderedPoints.length;
+  const longitudeScale = Math.max(
+    0.01,
+    Math.cos((averageLatitude * Math.PI) / 180)
+  );
+  const projectedPoints = renderedPoints.map((point) => ({
+    x: point.longitude * longitudeScale,
+    y: point.latitude,
+  }));
+  const projectedXs = projectedPoints.map((point) => point.x);
+  const projectedYs = projectedPoints.map((point) => point.y);
+  const minX = Math.min(...projectedXs);
+  const maxX = Math.max(...projectedXs);
+  const minY = Math.min(...projectedYs);
+  const maxY = Math.max(...projectedYs);
+  const xRange = maxX - minX;
+  const yRange = maxY - minY;
+  if (xRange < Number.EPSILON && yRange < Number.EPSILON) return null;
+
+  const availableWidth = viewWidth - padding * 2;
+  const availableHeight = viewHeight - padding * 2;
+  const scale = Math.min(
+    xRange > Number.EPSILON ? availableWidth / xRange : Infinity,
+    yRange > Number.EPSILON ? availableHeight / yRange : Infinity
+  );
+  const renderedWidth = xRange * scale;
+  const renderedHeight = yRange * scale;
+  const offsetX = (viewWidth - renderedWidth) / 2;
+  const offsetY = (viewHeight - renderedHeight) / 2;
+  const routeCoordinates = projectedPoints.map((point) => ({
+    x: offsetX + (point.x - minX) * scale,
+    y: offsetY + (maxY - point.y) * scale,
+  }));
+  const path = routeCoordinates
+    .map((point, index) => {
+      const { x, y } = point;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+  const start = routeCoordinates[0];
+  const end = routeCoordinates[routeCoordinates.length - 1];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${viewWidth}" height="${viewHeight}" viewBox="0 0 ${viewWidth} ${viewHeight}"><path d="${path}" fill="none" stroke="#FFFFFF" stroke-opacity="0.82" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="${path}" fill="none" stroke="#2A88CD" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${start.x.toFixed(2)}" cy="${start.y.toFixed(2)}" r="5" fill="#FFFFFF" stroke="#2A88CD" stroke-width="3"/><circle cx="${end.x.toFixed(2)}" cy="${end.y.toFixed(2)}" r="6" fill="#2A88CD" stroke="#FFFFFF" stroke-width="3"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 function waitForNextPaint(): Promise<void> {
@@ -201,6 +296,46 @@ function normalizeLocalFileUri(uri: string): string {
   return `file://${uri}`;
 }
 
+function getPhotoContentType(
+  uri: string
+): "image/avif" | "image/heic" | "image/heif" | "image/jpeg" | "image/png" | "image/webp" {
+  const path = uri.split("?")[0]?.toLowerCase() ?? "";
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".heic")) return "image/heic";
+  if (path.endsWith(".heif")) return "image/heif";
+  if (path.endsWith(".avif")) return "image/avif";
+  return "image/jpeg";
+}
+
+function hasSubmissionDeadlinePassed(value: string | null): boolean {
+  if (!value) return false;
+  const deadlineMs = new Date(value).getTime();
+  return Number.isFinite(deadlineMs) && Date.now() >= deadlineMs;
+}
+
+function isValidCoordinate(
+  point: { latitude: number; longitude: number } | null | undefined,
+): point is { latitude: number; longitude: number } {
+  return Boolean(
+    point &&
+      Number.isFinite(point.latitude) &&
+      Number.isFinite(point.longitude) &&
+      point.latitude >= -90 &&
+      point.latitude <= 90 &&
+      point.longitude >= -180 &&
+      point.longitude <= 180 &&
+      !(point.latitude === 0 && point.longitude === 0),
+  );
+}
+
+function shouldVerifyCrewSubmission(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === 409 || error.status === undefined || error.status === 0)
+  );
+}
+
 function buildShareMessage({
   caloriesLabel,
   dateLabel,
@@ -240,11 +375,17 @@ function buildShareMessage({
   return lines.join("\n");
 }
 
-export function ReportScreen() {
+export function ReportScreen({
+  crewContext = null,
+}: {
+  crewContext?: CrewPloggingRouteContext | null;
+} = {}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { session } = useAuthSession();
+  const { position } = useDeviceLocation();
   const {
+    addPhotoObjectUrl,
     caloriesBurned,
     distanceMeters,
     endCoord,
@@ -266,6 +407,20 @@ export function ReportScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [crewPhotoComposerVisible, setCrewPhotoComposerVisible] =
+    useState(false);
+  const [crewShareSheetVisible, setCrewShareSheetVisible] = useState(false);
+  const [crewSharePhotoIds, setCrewSharePhotoIds] = useState<
+    number[] | undefined
+  >();
+  const [crewParticipantCount, setCrewParticipantCount] = useState<
+    number | null
+  >(null);
+  const [photoViewerIndex, setPhotoViewerIndex] = useState<number | null>(null);
+  const [photoOverlayVisible, setPhotoOverlayVisible] = useState(false);
+  const [photoHintVisible, setPhotoHintVisible] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [mapImageCaptureState, setMapImageCaptureState] =
     useState<MapImageCaptureState>("idle");
   const [completeButtonWaitingDots, setCompleteButtonWaitingDots] =
@@ -276,6 +431,49 @@ export function ReportScreen() {
     insets.bottom +
     PRIMARY_BOTTOM_BUTTON_BASE_HEIGHT +
     FLOATING_SHARE_BUTTON_GAP;
+
+  useEffect(() => {
+    if (!session) {
+      setProfile(null);
+      return;
+    }
+
+    let disposed = false;
+    getUserProfile()
+      .then((nextProfile) => {
+        if (!disposed) setProfile(nextProfile);
+      })
+      .catch(() => {
+        if (!disposed) setProfile(null);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [session]);
+
+  useEffect(() => {
+    const crewSessionId = crewContext?.sessionId;
+    if (!crewSessionId) {
+      setCrewParticipantCount(null);
+      return;
+    }
+
+    let disposed = false;
+    getCrewPloggingSession({ sessionId: crewSessionId })
+      .then((crewSession) => {
+        if (!disposed) {
+          setCrewParticipantCount(Math.max(1, crewSession.participantCount));
+        }
+      })
+      .catch(() => {
+        if (!disposed) setCrewParticipantCount(null);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [crewContext?.sessionId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -297,8 +495,58 @@ export function ReportScreen() {
     hasRouteForMap && mapImageUri === null && !mapImageCaptureFailed;
   const completeButtonDisabled = submitting || completeButtonWaiting;
   const completeButtonTitle = completeButtonWaiting
-    ? completeButtonWaitingDots
+    ? `기록 준비 중${completeButtonWaitingDots}`
     : "플로깅 완료";
+
+  const navigateAfterCrewSubmission = useCallback(() => {
+    if (!crewContext) return;
+    router.replace({
+      pathname: "/crews/[crewId]/sessions/[sessionId]",
+      params: {
+        crewId: String(crewContext.crewId),
+        role: crewContext.role,
+        sessionId: String(crewContext.sessionId),
+      },
+    });
+  }, [crewContext, router]);
+
+  const navigateToCrewRecord = useCallback(() => {
+    if (!crewContext) return;
+    router.replace({
+      pathname: "/crews/[crewId]/records/[sessionId]",
+      params: {
+        crewId: String(crewContext.crewId),
+        sessionId: String(crewContext.sessionId),
+      },
+    });
+  }, [crewContext, router]);
+
+  const handleBack = useCallback(() => {
+    if (submitting) return;
+
+    Alert.alert(
+      "기록을 저장하지 않고 나갈까요?",
+      "지금 나가면 이번 플로깅 기록이 저장되지 않습니다.",
+      [
+        { style: "cancel", text: "계속 작성" },
+        {
+          onPress: () => {
+            resetSession();
+            if (crewContext) {
+              router.replace({
+                pathname: "/crews/[crewId]",
+                params: { crewId: String(crewContext.crewId) },
+              });
+              return;
+            }
+            router.replace("/");
+          },
+          style: "destructive",
+          text: "나가기",
+        },
+      ],
+    );
+  }, [crewContext, resetSession, router, submitting]);
 
   useEffect(() => {
     if (!completeButtonWaiting) {
@@ -324,7 +572,7 @@ export function ReportScreen() {
   const dateLabel = formatDateKo(startedAtMs);
   const timeRangeLabel =
     startedAtMs !== null && finishedAtMs !== null
-      ? `${formatHm(startedAtMs)} → ${formatHm(finishedAtMs)}`
+      ? `${formatHm(startedAtMs)} - ${formatHm(finishedAtMs)}`
       : "";
   const modeLabel =
     mode === "RECOMMENDED" ? "AI 추천 · 완료" : "자유모드 · 완료";
@@ -339,14 +587,89 @@ export function ReportScreen() {
   const stepCountLabel = formatInteger(stepCount);
   const ploggingTimeLabel = formatHmDuration(ploggingSecondsForView);
   const caloriesLabel = formatInteger(caloriesBurned);
-  const shareDistanceKm = formatKilometersForRecord(distanceMeters);
+  const shareDistanceKm = formatKilometers(distanceMeters);
   const shareMapImageUri = mapImageUri ?? mapImageObjectUrl;
-  const metrics: ReportMetric[] = [
+  const photoRouteOverlayUri = useMemo(
+    () => buildRouteOverlaySvgUri(routePoints),
+    [routePoints]
+  );
+  const overviewMetrics: ReportMetric[] = [
+    { label: "이동 거리", unit: "km", value: distanceKm },
     { label: "걸음 수", unit: "steps", value: stepCountLabel },
     { label: "플로깅 시간", unit: "H:M", value: ploggingTimeLabel },
-    { label: "소모 칼로리", unit: "kcal", value: caloriesLabel },
-    { label: "휴식", unit: "H:M", value: formatHmDuration(restSeconds) },
   ];
+  const posterData: PersonalReportPosterData = {
+    caloriesLabel,
+    dateValue: startedAtMs,
+    distanceKm: shareDistanceKm,
+    modeLabel: mode === "RECOMMENDED" ? "AI 추천" : "자유모드",
+    photoUris,
+    placeName,
+    ploggingTimeLabel,
+    routeImageUri: photoRouteOverlayUri,
+    stepCountLabel,
+  };
+  const crewReportRecord = useMemo<CrewPloggingRecordDetail | null>(() => {
+    if (!crewContext) return null;
+
+    const startedAt = new Date(startedAtMs ?? Date.now()).toISOString();
+    const endedAt = new Date(finishedAtMs ?? Date.now()).toISOString();
+    const uploaderUserId = session?.userId ?? 0;
+    const uploaderNickname = profile?.nickname ?? session?.nickname ?? "나";
+
+    return {
+      caloriesBurned: Math.round(caloriesBurned),
+      crewPloggingSessionId: crewContext.sessionId,
+      distanceMeters: Math.round(distanceMeters),
+      endedAt,
+      mapImageUrl: null,
+      mode: "FREE",
+      participantCount: Math.max(1, crewParticipantCount ?? 1),
+      participants: [
+        {
+          nickname: uploaderNickname,
+          profileImageUrl: profile?.profileImageUrl ?? null,
+          userId: uploaderUserId,
+        },
+      ],
+      photos: photoUris.map((uri, index) => ({
+        objectUrl: uri,
+        photoId: index + 1,
+        registeredAt: endedAt,
+        uploaderNickname,
+        uploaderProfileImageUrl: profile?.profileImageUrl ?? null,
+        uploaderUserId,
+      })),
+      placeName: placeName || null,
+      ploggingSeconds: ploggingSecondsForView,
+      representativeNickname: uploaderNickname,
+      representativeUserId: uploaderUserId,
+      startedAt,
+      stepCount: Math.round(stepCount),
+    };
+  }, [
+    caloriesBurned,
+    crewContext,
+    crewParticipantCount,
+    distanceMeters,
+    finishedAtMs,
+    photoUris,
+    placeName,
+    ploggingSecondsForView,
+    profile,
+    session,
+    startedAtMs,
+    stepCount,
+  ]);
+  const crewShareMessage = buildShareMessage({
+    caloriesLabel,
+    dateLabel,
+    distanceKm,
+    mapImageUrl: mapImageObjectUrl,
+    placeName,
+    ploggingTimeLabel,
+    stepCountLabel,
+  });
 
   const handleShare = useCallback(async () => {
     if (sharing) return;
@@ -498,6 +821,53 @@ export function ReportScreen() {
     }
   }, [hasRouteForMap, mapImageCaptureFailed, savingImage, shareMapImageUri]);
 
+  const handleSaveSelectedPhoto = useCallback(async () => {
+    if (savingImage || photoViewerIndex === null) return;
+    const selectedPhoto = photoUris[photoViewerIndex];
+    if (!selectedPhoto) return;
+
+    if (Platform.OS === "web") {
+      Alert.alert("저장 미지원", "사진 저장은 모바일 앱에서 사용할 수 있습니다.");
+      return;
+    }
+
+    setSavingImage(true);
+    try {
+      const permissionResult = await requestPhotoSavePermission();
+      if (permissionResult !== "granted") {
+        Alert.alert(
+          "저장 실패",
+          permissionResult === "denied"
+            ? "사진 앱에 저장하려면 사진 추가 권한이 필요합니다."
+            : "현재 실행 환경에서는 사진 앱 저장을 사용할 수 없습니다."
+        );
+        return;
+      }
+
+      const MediaLibrary = await loadMediaLibrary();
+      if (!MediaLibrary) {
+        Alert.alert("저장 미지원", "현재 실행 환경에서는 사진 앱 저장을 사용할 수 없습니다.");
+        return;
+      }
+
+      await MediaLibrary.saveToLibraryAsync(normalizeLocalFileUri(selectedPhoto));
+      Alert.alert("저장 완료", "인증샷을 사진 앱에 저장했습니다.");
+    } catch (error) {
+      Alert.alert(
+        "저장 실패",
+        error instanceof Error ? error.message : "사진을 저장하지 못했습니다."
+      );
+    } finally {
+      setSavingImage(false);
+    }
+  }, [photoUris, photoViewerIndex, savingImage]);
+
+  const openPhotoViewer = useCallback((index: number) => {
+    setPhotoViewerIndex(index);
+    setPhotoOverlayVisible(false);
+    setPhotoHintVisible(true);
+  }, []);
+
   const handleComplete = useCallback(async () => {
     if (submittedRef.current || submitting || completeButtonWaiting) return;
 
@@ -505,11 +875,11 @@ export function ReportScreen() {
       Alert.alert("저장 실패", "플로깅 시작 정보가 없습니다.");
       return;
     }
-    if (!session?.userId) {
+    if (!session) {
       Alert.alert("저장 실패", "로그인 정보가 없습니다. 다시 로그인해주세요.");
       return;
     }
-    if (!hasRouteForMap) {
+    if (!hasRouteForMap && !crewContext) {
       resetSession();
       router.replace("/");
       Alert.alert(
@@ -518,38 +888,76 @@ export function ReportScreen() {
       );
       return;
     }
-    if (mapImageCaptureFailed) {
+    if (mapImageCaptureFailed && !crewContext) {
       Alert.alert(
         "저장 실패",
         "경로 지도 이미지를 만들지 못했습니다. 지도 영역에서 다시 시도해주세요."
       );
       return;
     }
-    if (!mapImageUri) {
+    if (hasRouteForMap && !mapImageUri) {
       Alert.alert(
         "잠시만요",
         "경로가 그려진 지도 이미지를 생성하고 있어요. 잠시 후 다시 시도해주세요."
       );
       return;
     }
+    const fallbackCoord = isValidCoordinate(position) ? position : null;
+    const resolvedStartCoord = isValidCoordinate(startCoord)
+      ? startCoord
+      : routePoints.find(isValidCoordinate) ?? fallbackCoord;
+    const resolvedEndCoord = isValidCoordinate(endCoord)
+      ? endCoord
+      : [...routePoints].reverse().find(isValidCoordinate) ?? fallbackCoord;
+    if (!resolvedStartCoord || !resolvedEndCoord) {
+      Alert.alert(
+        "저장 실패",
+        "유효한 위치 정보가 없어 기록을 제출할 수 없습니다. 위치 권한을 허용하고 현재 위치가 확인된 뒤 다시 시도해주세요.",
+      );
+      return;
+    }
+    const resolvedRoutePoints = routePoints.some(isValidCoordinate)
+      ? routePoints.filter(isValidCoordinate)
+      : [resolvedStartCoord];
     const finishedAt = finishedAtMs ?? Date.now();
     const ploggingSeconds = Math.max(
       0,
       Math.floor((finishedAt - startedAtMs) / 1000) - restSeconds
     );
-    // 업로드 성공한 사진만 백엔드로 보낸다(로컬 URI는 서버가 접근 불가).
-    const photoUrls = photoUris
-      .map((uri) => photoObjectUrls[uri])
-      .filter((url): url is string => Boolean(url));
-
     submittedRef.current = true;
     setSubmitting(true);
     try {
+      // 촬영 직후 종료해도 진행 중이던 업로드 Promise를 함께 기다린다.
+      // 실패한 업로드는 이 지점에서 한 번 재시도하며, 한 장이라도 실패하면
+      // 사용자 확인 없이 사진을 조용히 누락해 제출하지 않는다.
+      const photoUploadResults = await Promise.all(
+        photoUris.map(async (uri) => {
+          const uploadedUrl = photoObjectUrls[uri];
+          if (uploadedUrl) return { status: "uploaded" as const, objectUrl: uploadedUrl };
+          const result = await uploadPloggingPhoto(uri, getPhotoContentType(uri));
+          if (result.status === "uploaded") {
+            addPhotoObjectUrl(uri, result.objectUrl);
+          }
+          return result;
+        })
+      );
+      const failedPhoto = photoUploadResults.find(
+        (result) => result.status === "error"
+      );
+      if (failedPhoto?.status === "error") {
+        throw new Error(`인증 사진 업로드 실패: ${failedPhoto.message}`);
+      }
+      const photoUrls = photoUploadResults
+        .filter(
+          (result): result is { status: "uploaded"; objectUrl: string } =>
+            result.status === "uploaded"
+        )
+        .map((result) => result.objectUrl);
+
       let resolvedMapImageUrl = mapImageObjectUrl;
-      if (!resolvedMapImageUrl) {
+      if (!resolvedMapImageUrl && mapImageUri) {
         const uploadResult = await uploadMapImage(
           mapImageUri,
-          session.userId,
           "image/png"
         );
         if (uploadResult.status !== "uploaded") {
@@ -560,7 +968,7 @@ export function ReportScreen() {
       }
 
       const payload: CompletePloggingSessionRequest = {
-        mode,
+        mode: crewContext ? "FREE" : mode,
         startedAt: new Date(startedAtMs).toISOString(),
         finishedAt: new Date(finishedAt).toISOString(),
         distanceMeters: Math.round(distanceMeters),
@@ -569,13 +977,14 @@ export function ReportScreen() {
         ploggingSeconds,
         restSeconds,
         placeName: placeName || "",
-        startLatitude: startCoord?.latitude ?? 0,
-        startLongitude: startCoord?.longitude ?? 0,
-        endLatitude: endCoord?.latitude ?? 0,
-        endLongitude: endCoord?.longitude ?? 0,
-        routePoints,
-        mapImageUrl: resolvedMapImageUrl,
+        startLatitude: resolvedStartCoord.latitude,
+        startLongitude: resolvedStartCoord.longitude,
+        endLatitude: resolvedEndCoord.latitude,
+        endLongitude: resolvedEndCoord.longitude,
+        routePoints: resolvedRoutePoints,
+        mapImageUrl: resolvedMapImageUrl ?? undefined,
         photoUrls,
+        crewPloggingSessionId: crewContext?.sessionId,
       };
       if (__DEV__) {
         console.log("[plogging-complete] requestBody", {
@@ -586,13 +995,61 @@ export function ReportScreen() {
         });
       }
 
-      await completePloggingSession({
-        payload,
-        userId: session.userId,
-      });
-      resetSession();
-      router.replace("/history");
+      await completePloggingSession(payload);
+      if (crewContext) {
+        // 제출 완료 대기 화면은 방금 측정한 지도와 통계를 그대로 보여준다.
+        // 측정 구독은 이미 종료됐으며, 세션 완료/홈 이동 시점에 초기화한다.
+        navigateAfterCrewSubmission();
+      } else {
+        resetSession();
+        router.replace("/history");
+      }
     } catch (error) {
+      if (crewContext && shouldVerifyCrewSubmission(error)) {
+        try {
+          const currentSession = await getCrewPloggingSession({
+            sessionId: crewContext.sessionId,
+          });
+          if (
+            currentSession.recordSubmittedByMe ||
+            currentSession.participantStatus === "SUBMITTED"
+          ) {
+            navigateAfterCrewSubmission();
+            return;
+          }
+          if (
+            currentSession.status === "COMPLETED" ||
+            currentSession.participantStatus === "NOT_SUBMITTED"
+          ) {
+            resetSession();
+            navigateToCrewRecord();
+            return;
+          }
+          if (
+            currentSession.status === "COMPLETING" &&
+            hasSubmissionDeadlinePassed(currentSession.submissionDeadlineAt)
+          ) {
+            submittedRef.current = false;
+            resetSession();
+            router.replace({
+              pathname: "/crews/[crewId]/sessions/[sessionId]",
+              params: {
+                crewId: String(crewContext.crewId),
+                role: crewContext.role,
+                sessionId: String(crewContext.sessionId),
+              },
+            });
+            Alert.alert(
+              "제출 마감",
+              "기록 제출 시간이 종료되었습니다. 서버의 최종 처리를 기다려주세요."
+            );
+            return;
+          }
+        } catch {
+          // 원래 완료 요청 오류를 표시한다.
+        }
+      }
+
       submittedRef.current = false;
       const message =
         error instanceof Error
@@ -603,24 +1060,29 @@ export function ReportScreen() {
       setSubmitting(false);
     }
   }, [
+    addPhotoObjectUrl,
     caloriesBurned,
     completeButtonWaiting,
     distanceMeters,
     endCoord,
     finishedAtMs,
     hasRouteForMap,
+    crewContext,
     mapImageCaptureFailed,
     mapImageObjectUrl,
     mapImageUri,
     mode,
+    navigateAfterCrewSubmission,
+    navigateToCrewRecord,
     photoObjectUrls,
     photoUris,
     placeName,
     resetSession,
     restSeconds,
     routePoints,
+    position,
     router,
-    session?.userId,
+    session,
     setMapImageObjectUrl,
     startCoord,
     startedAtMs,
@@ -634,7 +1096,7 @@ export function ReportScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top, 44) + 16,
+            paddingTop: Math.max(insets.top, 47) + 10,
             paddingBottom:
               shareButtonBottom +
               FLOATING_SHARE_BUTTON_HEIGHT +
@@ -644,26 +1106,38 @@ export function ReportScreen() {
         showsVerticalScrollIndicator={false}
       >
         <ReportHeader
-          modeLabel={modeLabel}
+          backDisabled={submitting}
+          onBack={handleBack}
           onSave={handleSaveImage}
           saving={savingImage}
         />
+        <View style={styles.statusPill}>
+          <Text selectable style={styles.statusText}>
+            {modeLabel.replace(" · 완료", "")}
+          </Text>
+        </View>
         <ReportTitleBlock
           dateLabel={dateLabel}
           placeName={placeName}
           timeRangeLabel={timeRangeLabel}
         />
         <DistanceSummaryCard
-          distanceKm={distanceKm}
+          metrics={overviewMetrics}
           onMapImageCaptureStateChange={setMapImageCaptureState}
         />
-        <ReportMetricsCard metrics={metrics} />
-        <PhotoGallery photoUris={photoUris} />
+        <PhotoGallery onSelect={openPhotoViewer} photoUris={photoUris} />
+        <ExperienceCard profile={profile} />
+        {crewContext ? (
+          <CrewCertificationPhotoButton
+            disabled={submitting || photoUris.length === 0}
+            onPress={() => setCrewPhotoComposerVisible(true)}
+          />
+        ) : null}
       </ScrollView>
       <ShareButton
         bottom={shareButtonBottom}
         disabled={sharing}
-        onPress={handleShare}
+        onPress={() => setShareSheetVisible(true)}
       />
       <PrimaryBottomButton
         accessibilityLabel={
@@ -674,23 +1148,82 @@ export function ReportScreen() {
         title={completeButtonTitle}
       />
       {submitting ? <SubmittingOverlay /> : null}
-      <View
-        ref={sharePreviewRef}
-        collapsable={false}
-        pointerEvents="none"
-        style={styles.sharePreviewHost}
-      >
-        <SharePreviewCard
-          dateLabel={dateLabel}
-          distanceKm={shareDistanceKm}
-          mapImageUri={shareMapImageUri}
-          metrics={metrics}
-          modeLabel={modeLabel}
-          photoUris={photoUris}
-          placeName={placeName}
-          timeRangeLabel={timeRangeLabel}
-        />
+      <View pointerEvents="none" style={styles.sharePreviewHost}>
+        <PersonalReportPoster data={posterData} ref={sharePreviewRef} />
       </View>
+      <PersonalReportShareSheet
+        completeDisabled={completeButtonDisabled}
+        completeTitle={completeButtonTitle}
+        data={posterData}
+        onClose={() => setShareSheetVisible(false)}
+        onComplete={() => {
+          setShareSheetVisible(false);
+          void handleComplete();
+        }}
+        onSave={() => {
+          setShareSheetVisible(false);
+          void handleSaveImage();
+        }}
+        onShare={() => {
+          setShareSheetVisible(false);
+          void handleShare();
+        }}
+        saving={savingImage}
+        sharing={sharing}
+        visible={shareSheetVisible}
+      />
+      {crewReportRecord ? (
+        <>
+          <CrewPhotoComposer
+            onClose={() => setCrewPhotoComposerVisible(false)}
+            onGenerate={(photoIds) => {
+              setCrewPhotoComposerVisible(false);
+              setCrewSharePhotoIds(photoIds);
+              setCrewShareSheetVisible(true);
+            }}
+            record={crewReportRecord}
+            visible={crewPhotoComposerVisible}
+          />
+          <ReportShareSheet
+            completeDisabled={completeButtonDisabled}
+            completeTitle={completeButtonTitle}
+            message={crewShareMessage}
+            onClose={() => setCrewShareSheetVisible(false)}
+            onComplete={() => {
+              setCrewShareSheetVisible(false);
+              void handleComplete();
+            }}
+            record={crewReportRecord}
+            routeOverlayUri={photoRouteOverlayUri}
+            selectedPhotoIds={crewSharePhotoIds}
+            visible={crewShareSheetVisible}
+          />
+        </>
+      ) : null}
+      <PhotoViewer
+        dateLabel={dateLabel}
+        distanceKm={shareDistanceKm}
+        hintVisible={photoHintVisible}
+        onClose={() => setPhotoViewerIndex(null)}
+        onSave={() => {
+          void handleSaveSelectedPhoto();
+        }}
+        onSelect={(index) => {
+          setPhotoViewerIndex(index);
+          setPhotoOverlayVisible(false);
+          setPhotoHintVisible(false);
+        }}
+        onToggleOverlay={() => {
+          setPhotoHintVisible(false);
+          setPhotoOverlayVisible((visible) => !visible);
+        }}
+        overlayVisible={photoOverlayVisible}
+        photoUris={photoUris}
+        routeOverlayUri={photoRouteOverlayUri}
+        selectedIndex={photoViewerIndex}
+        stepCountLabel={stepCountLabel}
+        timeLabel={ploggingTimeLabel}
+      />
     </ScreenRoot>
   );
 }
@@ -710,17 +1243,34 @@ function SubmittingOverlay() {
 }
 
 function ReportHeader({
-  modeLabel,
+  backDisabled,
+  onBack,
   onSave,
   saving,
 }: {
-  modeLabel: string;
+  backDisabled: boolean;
+  onBack: () => void;
   onSave: () => void;
   saving: boolean;
 }) {
   return (
-    <>
-      <View style={styles.headerActions}>
+    <View style={styles.headerActions}>
+      <Pressable
+        accessibilityLabel="뒤로가기"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: backDisabled }}
+        disabled={backDisabled}
+        hitSlop={8}
+        onPress={onBack}
+        style={({ pressed }) => [
+          styles.headerButton,
+          pressed ? styles.pressed : null,
+          backDisabled ? styles.disabled : null,
+        ]}
+      >
+        <ExpoImage contentFit="contain" source={reportIcons.back} style={styles.headerBackIcon} />
+      </Pressable>
+      <View style={styles.headerSaveAction}>
         <Pressable
           accessibilityLabel={saving ? "저장 중" : "저장하기"}
           accessibilityRole="button"
@@ -734,15 +1284,11 @@ function ReportHeader({
             saving ? styles.disabled : null,
           ]}
         >
-          <Feather color={colors.icon} name="download" size={20} />
+          <ExpoImage contentFit="contain" source={reportIcons.reportSave} style={styles.headerSaveIcon} />
         </Pressable>
+        <Text style={styles.headerSaveLabel}>저장하기</Text>
       </View>
-      <View style={styles.statusPill}>
-        <Text selectable style={styles.statusText}>
-          {modeLabel}
-        </Text>
-      </View>
-    </>
+    </View>
   );
 }
 
@@ -774,10 +1320,10 @@ function ReportTitleBlock({
 }
 
 function DistanceSummaryCard({
-  distanceKm,
+  metrics,
   onMapImageCaptureStateChange,
 }: {
-  distanceKm: string;
+  metrics: ReportMetric[];
   onMapImageCaptureStateChange: (state: MapImageCaptureState) => void;
 }) {
   const {
@@ -878,13 +1424,7 @@ function DistanceSummaryCard({
   ]);
 
   return (
-    <View style={styles.distanceCard}>
-      <Text selectable style={styles.cardCaption}>
-        DISTANCE
-      </Text>
-      <View style={styles.distanceHeader}>
-        <StatNumber size={36} unit="km" value={distanceKm} />
-      </View>
+    <View style={styles.overviewCard}>
       <View style={styles.miniMap}>
         {mapImageUri ? (
           <Image
@@ -927,150 +1467,259 @@ function DistanceSummaryCard({
           </View>
         )}
       </View>
-    </View>
-  );
-}
-
-function ReportMetricsCard({ metrics }: { metrics: ReportMetric[] }) {
-  return (
-    <View style={styles.metricsCard}>
-      {metrics.map((metric) => (
-        <MetricCell key={metric.label} metric={metric} />
-      ))}
-    </View>
-  );
-}
-
-function MetricCell({ metric }: { metric: ReportMetric }) {
-  return (
-    <View style={styles.metricCell}>
-      <Text selectable style={styles.metricLabel}>
-        {metric.label}
-      </Text>
-      <StatNumber size={24} unit={metric.unit} value={metric.value} />
-    </View>
-  );
-}
-
-function SharePreviewCard({
-  dateLabel,
-  distanceKm,
-  mapImageUri,
-  metrics,
-  modeLabel,
-  photoUris,
-  placeName,
-  timeRangeLabel,
-}: {
-  dateLabel: string;
-  distanceKm: string;
-  mapImageUri: string | null;
-  metrics: ReportMetric[];
-  modeLabel: string;
-  photoUris: string[];
-  placeName: string;
-  timeRangeLabel: string;
-}) {
-  return (
-    <View style={styles.sharePreviewCanvas}>
-      <View style={styles.statusPill}>
-        <Text selectable style={styles.statusText}>
-          {modeLabel}
-        </Text>
-      </View>
-
-      {dateLabel ? (
-        <Text selectable style={styles.reportTitle}>
-          <Text style={styles.reportTitleBold}>{dateLabel}</Text> 플로깅
-        </Text>
-      ) : null}
-      {timeRangeLabel ? (
-        <Text selectable style={styles.reportSubTitle}>
-          {timeRangeLabel}
-          {placeName ? (
-            <>
-              {" · "}
-              <Text style={styles.reportSubTitleBold}>{placeName}</Text>
-            </>
-          ) : null}
-        </Text>
-      ) : null}
-
-      <View style={styles.distanceCard}>
-        <Text selectable style={styles.cardCaption}>
-          DISTANCE
-        </Text>
-        <View style={styles.distanceHeader}>
-          <StatNumber size={36} unit="km" value={distanceKm} />
-        </View>
-        <View style={styles.miniMap}>
-          {mapImageUri ? (
-            <Image
-              accessibilityLabel="플로깅 경로 이미지"
-              source={{ uri: mapImageUri }}
-              style={styles.miniMapImage}
-            />
-          ) : (
-            <View style={styles.miniMapEmpty}>
-              <Text selectable style={styles.miniMapEmptyText}>
-                지도 이미지가 없습니다.
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <ReportMetricsCard metrics={metrics} />
-      <SharePreviewPhotoSection photoUris={photoUris} />
-    </View>
-  );
-}
-
-function SharePreviewPhotoSection({ photoUris }: { photoUris: string[] }) {
-  if (photoUris.length === 0) return null;
-
-  return (
-    <View style={styles.sharePhotoSection}>
-      <Text selectable style={styles.sharePhotoSectionTitle}>
-        인증샷
-      </Text>
-      <ScrollView
-        contentContainerStyle={styles.sharePhotoStripContent}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {photoUris.map((uri) => (
-          <Image
-            key={uri}
-            accessibilityLabel="플로깅 인증샷"
-            source={{ uri }}
-            style={styles.sharePhotoThumb}
-          />
+      <View style={styles.overviewMetrics}>
+        {metrics.map((metric) => (
+          <View key={metric.label} style={styles.overviewMetric}>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              numberOfLines={1}
+              style={styles.overviewMetricValue}
+            >
+              {metric.value}
+              <Text style={styles.overviewMetricUnit}> {metric.unit}</Text>
+            </Text>
+          </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 // 참고 UI: 인증샷 4장을 한 줄에 균등 배치한 갤러리 섹션.
 // 사진이 4장 미만이면 가능한 만큼만 보여주고, 0장이면 섹션 자체를 숨긴다.
-function PhotoGallery({ photoUris }: { photoUris: string[] }) {
+function PhotoGallery({
+  onSelect,
+  photoUris,
+}: {
+  onSelect: (index: number) => void;
+  photoUris: string[];
+}) {
+  const { width: viewportWidth } = useWindowDimensions();
   if (photoUris.length === 0) return null;
 
-  // 참고 UI는 한 행에 최대 4장이 꽉 차게 배치되어 있다.
   const visiblePhotos = photoUris.slice(0, 4);
+  const availableWidth = Math.max(
+    0,
+    viewportWidth - REPORT_CONTENT_HORIZONTAL_PADDING * 2
+  );
+  const tileWidth = Math.min(
+    REPORT_PHOTO_MAX_WIDTH,
+    Math.max(
+      0,
+      (availableWidth - REPORT_PHOTO_GAP * 3) / 4
+    )
+  );
+  const tileHeight = tileWidth / REPORT_PHOTO_ASPECT_RATIO;
 
   return (
     <View style={styles.photoGallery}>
       {visiblePhotos.map((uri, index) => (
-        <Image
+        <Pressable
           key={`${uri}-${index}`}
-          accessibilityLabel="플로깅 인증샷"
-          source={{ uri }}
-          style={styles.photoTile}
-        />
+          accessibilityLabel={`플로깅 인증샷 ${index + 1} 보기`}
+          accessibilityRole="button"
+          onPress={() => onSelect(index)}
+          style={[
+            styles.photoTileWrap,
+            { height: tileHeight, width: tileWidth, zIndex: 4 - index },
+          ]}
+        >
+          <Image source={{ uri }} style={styles.photoTile} />
+        </Pressable>
       ))}
     </View>
+  );
+}
+
+function ExperienceCard({ profile }: { profile: UserProfile | null }) {
+  const level = profile?.level ?? 1;
+  const experience = profile?.experience ?? 0;
+  const currentLevelExperience = Math.max(0, experience - (level - 1) * 1000);
+  const remainingExperience = Math.max(0, 1000 - currentLevelExperience);
+  const progress = `${Math.min(
+    100,
+    (currentLevelExperience / 1000) * 100
+  )}%` as const;
+
+  return (
+    <View style={styles.experienceCard}>
+      <View style={styles.experienceLevelBadge}>
+        <Text style={styles.experienceLevelText}>Lv.{level}</Text>
+      </View>
+      <Text style={styles.experienceTitle}>{profile?.title ?? "초보 플로거"}</Text>
+      <Text style={styles.experienceRemaining}>
+        <Text style={styles.experienceRemainingMuted}>다음 레벨까지 </Text>
+        {remainingExperience.toLocaleString("ko-KR")} XP
+      </Text>
+      <View style={styles.experienceTrack}>
+        <View style={[styles.experienceProgress, { width: progress }]} />
+      </View>
+      <View pointerEvents="none" style={styles.experienceMarkerTrack}>
+        <Text style={[styles.experienceMarker, { left: progress }]}>▲</Text>
+      </View>
+      <View style={styles.experienceCharacter}>
+        <ExpoImage
+          contentFit="cover"
+          source={require("@/assets/images/plover-experience.png")}
+          style={styles.experienceCharacterImage}
+        />
+      </View>
+    </View>
+  );
+}
+
+function PhotoViewer({
+  dateLabel,
+  distanceKm,
+  hintVisible,
+  onClose,
+  onSave,
+  onSelect,
+  onToggleOverlay,
+  overlayVisible,
+  photoUris,
+  routeOverlayUri,
+  selectedIndex,
+  stepCountLabel,
+  timeLabel,
+}: {
+  dateLabel: string;
+  distanceKm: string;
+  hintVisible: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  onSelect: (index: number) => void;
+  onToggleOverlay: () => void;
+  overlayVisible: boolean;
+  photoUris: string[];
+  routeOverlayUri: string | null;
+  selectedIndex: number | null;
+  stepCountLabel: string;
+  timeLabel: string;
+}) {
+  const selectedPhoto = selectedIndex === null ? null : photoUris[selectedIndex];
+  const viewerInsets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      animationType="fade"
+      navigationBarTranslucent
+      onRequestClose={onClose}
+      statusBarTranslucent
+      visible={selectedPhoto !== null}
+    >
+      <View style={styles.photoViewerRoot}>
+        <StatusBar backgroundColor="#1A1A1A" style="light" />
+        <View style={[styles.photoViewerHeader, { paddingTop: viewerInsets.top }]}>
+          <View style={styles.photoViewerHeaderRow}>
+            <View style={styles.photoViewerHeaderSide} />
+            <Text numberOfLines={1} style={styles.photoViewerTitle}>
+              {dateLabel} 플로깅
+            </Text>
+            <Pressable
+              accessibilityLabel="사진 닫기"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [
+                styles.photoViewerClose,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <ExpoImage
+                contentFit="contain"
+                source={reportIcons.photoClose}
+                style={styles.photoViewerCloseIcon}
+              />
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.photoViewerBody}>
+          {selectedPhoto ? (
+            <Pressable
+              accessibilityLabel="사진 기록 표시 전환"
+              accessibilityRole="button"
+              onPress={onToggleOverlay}
+              style={styles.photoViewerImageWrap}
+            >
+              <Image source={{ uri: selectedPhoto }} style={styles.photoViewerImage} />
+              {overlayVisible ? (
+                <View style={StyleSheet.absoluteFill}>
+                  {routeOverlayUri ? (
+                    <ExpoImage
+                      contentFit="contain"
+                      source={{ uri: routeOverlayUri }}
+                      style={styles.photoViewerRoute}
+                    />
+                  ) : null}
+                  <View style={styles.photoViewerMetrics}>
+                    <PhotoOverlayMetric unit="km" value={distanceKm} />
+                    <PhotoOverlayMetric unit="steps" value={stepCountLabel} />
+                    <PhotoOverlayMetric unit="H:M" value={timeLabel} />
+                  </View>
+                </View>
+              ) : null}
+              {hintVisible ? (
+                <View style={styles.photoViewerHint}>
+                  <Text style={styles.photoViewerHintText}>
+                    사진을 터치하여 기록을 띄워보세요!
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
+          <View style={styles.photoViewerThumbs}>
+            {photoUris.slice(0, 4).map((uri, index) => (
+              <Pressable
+                accessibilityLabel={`사진 ${index + 1} 보기`}
+                accessibilityRole="button"
+                key={`${uri}-${index}`}
+                onPress={() => onSelect(index)}
+                style={[
+                  styles.photoViewerThumbWrap,
+                  index === selectedIndex
+                    ? styles.photoViewerThumbSelected
+                    : null,
+                ]}
+              >
+                <Image source={{ uri }} style={styles.photoViewerThumb} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View
+          style={[
+            styles.photoViewerFooter,
+            { paddingBottom: Math.max(viewerInsets.bottom, 16) },
+          ]}
+        >
+          <Pressable
+            accessibilityLabel="사진 저장하기"
+            accessibilityRole="button"
+            onPress={onSave}
+            style={({ pressed }) => [
+              styles.photoViewerSave,
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <ExpoImage
+              contentFit="contain"
+              source={reportIcons.photoSave}
+              style={styles.photoViewerSaveIcon}
+            />
+            <Text style={styles.photoViewerSaveText}>저장하기</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function PhotoOverlayMetric({ unit, value }: { unit: string; value: string }) {
+  return (
+    <Text style={styles.photoViewerMetricValue}>
+      {value} <Text style={styles.photoViewerMetricUnit}>{unit}</Text>
+    </Text>
   );
 }
 
@@ -1084,89 +1733,136 @@ function ShareButton({
   disabled: boolean;
   onPress: () => void;
 }) {
-  const bobTranslateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (disabled) {
-      bobTranslateY.stopAnimation(() => {
-        bobTranslateY.setValue(0);
-      });
-      return;
-    }
-
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bobTranslateY, {
-          duration: 650,
-          easing: Easing.inOut(Easing.quad),
-          toValue: -FLOATING_SHARE_BUTTON_BOB_DISTANCE,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bobTranslateY, {
-          duration: 650,
-          easing: Easing.inOut(Easing.quad),
-          toValue: 0,
-          useNativeDriver: true,
-        }),
-        Animated.delay(420),
-      ])
-    );
-
-    animation.start();
-
-    return () => {
-      animation.stop();
-      bobTranslateY.setValue(0);
-    };
-  }, [bobTranslateY, disabled]);
-
   return (
     <View
       pointerEvents="box-none"
       style={[styles.shareButtonOverlay, { bottom }]}
     >
-      <Animated.View style={{ transform: [{ translateY: bobTranslateY }] }}>
-        <Pressable
-          accessibilityLabel="SNS 공유하기"
-          accessibilityRole="button"
-          accessibilityState={{ disabled }}
-          disabled={disabled}
-          hitSlop={8}
-          onPress={onPress}
-          style={({ pressed }) => [
-            styles.shareButton,
-            pressed ? styles.pressed : null,
-            disabled ? styles.disabled : null,
-          ]}
-        >
-          <Feather color={colors.icon} name="upload" size={19} />
-          <Text selectable style={styles.shareText}>
-            SNS 공유하기
-          </Text>
-        </Pressable>
-      </Animated.View>
+      <Pressable
+        accessibilityLabel="공유하기"
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        hitSlop={8}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.shareButton,
+          pressed ? styles.pressed : null,
+          disabled ? styles.disabled : null,
+        ]}
+      >
+        <ExpoImage contentFit="contain" source={reportIcons.share} style={styles.shareIcon} />
+        <Text selectable style={styles.shareText}>
+          공유하기
+        </Text>
+      </Pressable>
     </View>
+  );
+}
+
+function CrewCertificationPhotoButton({
+  disabled,
+  onPress,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={
+        disabled
+          ? "완료리포트에 인증샷이 있어야 만들 수 있습니다"
+          : "완료리포트의 인증샷을 골라 크루 공유 이미지를 만듭니다"
+      }
+      accessibilityLabel="크루 인증사진 만들기"
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.crewPhotoButton,
+        disabled ? styles.crewPhotoButtonDisabled : null,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <View style={styles.crewPhotoButtonIconCircle}>
+        <ExpoImage
+          contentFit="contain"
+          source={reportIcons.crewAdd}
+          style={styles.crewPhotoButtonIcon}
+        />
+      </View>
+      <View style={styles.crewPhotoButtonCopy}>
+        <Text style={styles.crewPhotoButtonTitle}>크루 인증사진 만들기</Text>
+        <Text style={styles.crewPhotoButtonDescription}>
+          {disabled ? "인증샷을 추가하면 만들 수 있어요" : "최대 4장의 사진으로 만들어요"}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   cardCaption: {
     color: colors.subtle,
+    fontFamily: fontFamilies.medium,
     fontSize: 14,
-    fontWeight: "500",
-    letterSpacing: 0,
+    letterSpacing: -0.28,
   },
   content: {
-    gap: 14,
-    paddingBottom: 150,
-    paddingHorizontal: 22,
+    paddingBottom: 180,
+    paddingHorizontal: 24,
+  },
+  crewPhotoButton: {
+    alignItems: "center",
+    backgroundColor: "#E4EFFA",
+    borderColor: "#8DC3EC",
+    borderCurve: "continuous",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+    minHeight: 72,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    width: "100%",
+  },
+  crewPhotoButtonCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  crewPhotoButtonDescription: {
+    color: "#4E7390",
+    fontFamily: fontFamilies.regular,
+    fontSize: 12,
+  },
+  crewPhotoButtonDisabled: {
+    opacity: 0.5,
+  },
+  crewPhotoButtonIcon: {
+    height: 16,
+    width: 16,
+  },
+  crewPhotoButtonIconCircle: {
+    alignItems: "center",
+    backgroundColor: "#2A88CD",
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  crewPhotoButtonTitle: {
+    color: "#1B6CAE",
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 16,
+    letterSpacing: -0.32,
   },
   distanceCard: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
-    gap: 12,
-    minHeight: 311,
-    padding: 20,
+    borderRadius: 12,
+    gap: 10,
+    padding: 16,
     ...shadows.raised,
   },
   distanceHeader: {
@@ -1180,44 +1876,44 @@ const styles = StyleSheet.create({
   headerActions: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "flex-end",
+    height: 60,
+    justifyContent: "space-between",
+  },
+  headerBackIcon: {
+    height: 24,
+    width: 24,
   },
   headerButton: {
     alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: 12,
-    height: 34,
+    height: 44,
     justifyContent: "center",
-    width: 34,
+    width: 44,
     ...shadows.soft,
   },
-  metricCell: {
-    gap: 8,
-    width: "46%",
+  headerSaveAction: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 3,
   },
-  metricLabel: {
-    color: colors.subtle,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0,
+  headerSaveIcon: {
+    height: 24,
+    width: 24,
   },
-  metricsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 22,
-    minHeight: 162,
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-    ...shadows.raised,
+  headerSaveLabel: {
+    color: "#121212",
+    fontFamily: fontFamilies.regular,
+    fontSize: 10,
+    letterSpacing: -0.2,
   },
   miniMap: {
-    borderRadius: 24,
-    flex: 1,
-    minHeight: 196,
-    overflow: "hidden",
     backgroundColor: colors.line,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    height: 189,
+    overflow: "hidden",
+    width: "100%",
   },
   miniMapImage: {
     backgroundColor: colors.line,
@@ -1232,8 +1928,8 @@ const styles = StyleSheet.create({
   },
   miniMapEmptyText: {
     color: colors.subtle,
+    fontFamily: fontFamilies.medium,
     fontSize: 13,
-    fontWeight: "500",
   },
   miniMapRetryButton: {
     alignItems: "center",
@@ -1246,54 +1942,96 @@ const styles = StyleSheet.create({
   },
   miniMapRetryText: {
     color: colors.surface,
+    fontFamily: fontFamilies.semiBold,
     fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0,
+    letterSpacing: -0.26,
   },
-  // 인증샷 갤러리: 한 행에 4칸이 꽉 차게, 사진 사이는 살짝 간격을 둔다.
+  overviewCard: {
+    borderRadius: 12,
+    height: 260,
+    marginTop: 22,
+    overflow: "hidden",
+    ...shadows.raised,
+  },
+  overviewMetric: {
+    justifyContent: "center",
+    minWidth: 0,
+  },
+  overviewMetricUnit: {
+    color: "#121212",
+    fontFamily: fontFamilies.giantsRegular,
+    fontSize: 10,
+    letterSpacing: -0.2,
+  },
+  overviewMetricValue: {
+    color: "#121212",
+    fontFamily: fontFamilies.giantsRegular,
+    fontSize: 22,
+    letterSpacing: -0.44,
+  },
+  overviewMetrics: {
+    backgroundColor: "#FFFFFF",
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    flexDirection: "row",
+    height: 71,
+    justifyContent: "space-between",
+    paddingLeft: 23,
+    paddingRight: 18,
+  },
   photoGallery: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: 4,
+    gap: REPORT_PHOTO_GAP,
+    marginTop: 21,
+    width: "100%",
   },
   photoTile: {
-    aspectRatio: 1,
     backgroundColor: colors.line,
-    borderRadius: 12,
-    flex: 1,
+    borderRadius: 6,
+    height: "100%",
+    width: "100%",
+  },
+  photoTileWrap: {
+    borderRadius: 6,
+    ...shadows.raised,
   },
   pressed: {
     opacity: 0.72,
     transform: [{ scale: 0.98 }],
   },
   reportSubTitle: {
-    color: colors.text,
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.regular,
     fontSize: 12,
-    letterSpacing: 0,
-    marginBottom: 2,
-  },
-  reportSubTitleBold: {
-    fontWeight: "600",
-  },
-  reportTitle: {
-    color: colors.text,
-    fontSize: 28,
-    letterSpacing: 0,
+    letterSpacing: -0.24,
+    lineHeight: getSafeLineHeight(12, fontFamilies.regular, 12),
     marginTop: 8,
   },
+  reportSubTitleBold: {
+    fontFamily: fontFamilies.medium,
+  },
+  reportTitle: {
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.regular,
+    fontSize: 28,
+    letterSpacing: -0.56,
+    lineHeight: getSafeLineHeight(28, fontFamilies.regular, 28),
+    marginTop: 12,
+  },
   reportTitleBold: {
-    fontWeight: "800",
+    fontFamily: fontFamilies.semiBold,
   },
   shareButton: {
     alignItems: "center",
     backgroundColor: colors.background,
     borderColor: colors.primary,
-    borderRadius: 27,
-    borderWidth: 1.5,
+    borderRadius: FLOATING_SHARE_BUTTON_HEIGHT / 2,
+    borderWidth: 1,
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     height: FLOATING_SHARE_BUTTON_HEIGHT,
-    paddingHorizontal: 23,
+    justifyContent: "center",
+    width: 184,
     ...shadows.soft,
   },
   shareButtonOverlay: {
@@ -1304,43 +2042,20 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   shareText: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "500",
-    letterSpacing: 0,
-  },
-  sharePhotoSection: {
-    gap: 10,
-    marginTop: 4,
-  },
-  sharePhotoSectionTitle: {
-    color: colors.text,
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.medium,
     fontSize: 14,
-    fontWeight: "600",
-    letterSpacing: 0,
+    letterSpacing: -0.28,
   },
-  sharePhotoStripContent: {
-    gap: 10,
-    paddingVertical: 2,
-  },
-  sharePhotoThumb: {
-    backgroundColor: colors.line,
-    borderRadius: 16,
-    height: 110,
-    width: 110,
-  },
-  sharePreviewCanvas: {
-    backgroundColor: colors.background,
-    gap: 14,
-    paddingHorizontal: 22,
-    paddingVertical: 24,
-    width: SHARE_PREVIEW_WIDTH,
+  shareIcon: {
+    height: 20,
+    width: 20,
   },
   sharePreviewHost: {
     left: -10000,
     position: "absolute",
     top: 0,
-    width: SHARE_PREVIEW_WIDTH,
+    width: 140,
   },
   submittingIndicator: {
     alignItems: "center",
@@ -1361,18 +2076,246 @@ const styles = StyleSheet.create({
   statusPill: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
-    borderRadius: 24,
-    borderWidth: 1,
+    backgroundColor: "#F2F7FD",
+    borderColor: "#E4EFFA",
+    borderRadius: 23,
+    borderWidth: 2,
+    height: 30,
     justifyContent: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
   },
   statusText: {
-    color: colors.primary,
+    color: "#1B6CAE",
+    fontFamily: fontFamilies.semiBold,
     fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0,
+    letterSpacing: -0.24,
+  },
+  experienceCharacter: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    height: 74,
+    overflow: "hidden",
+    position: "absolute",
+    right: 20,
+    top: 14,
+    width: 74,
+  },
+  experienceCharacterImage: {
+    height: 94,
+    left: -10,
+    position: "absolute",
+    top: -8,
+    transform: [{ rotate: "-8.51deg" }],
+    width: 98,
+  },
+  experienceCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    height: 104,
+    marginTop: 20,
+    position: "relative",
+    ...shadows.raised,
+  },
+  experienceLevelBadge: {
+    alignItems: "center",
+    backgroundColor: "#1FA868",
+    borderRadius: 17,
+    height: 18,
+    justifyContent: "center",
+    left: 22,
+    position: "absolute",
+    top: 19,
+    width: 40,
+  },
+  experienceLevelText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    letterSpacing: -0.24,
+  },
+  experienceProgress: {
+    backgroundColor: "#1FA868",
+    borderRadius: 26,
+    height: 5,
+  },
+  experienceMarker: {
+    color: "#1FA868",
+    fontFamily: fontFamilies.medium,
+    fontSize: 10,
+    marginLeft: -5,
+    position: "absolute",
+    top: 0,
+  },
+  experienceMarkerTrack: {
+    height: 12,
+    left: 22,
+    position: "absolute",
+    top: 70,
+    width: 209,
+  },
+  experienceRemaining: {
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.medium,
+    fontSize: 10,
+    left: 22,
+    letterSpacing: -0.2,
+    position: "absolute",
+    top: 44,
+  },
+  experienceRemainingMuted: {
+    color: "#A3A3A3",
+  },
+  experienceTitle: {
+    color: "#0A0A0A",
+    fontFamily: fontFamilies.medium,
+    fontSize: 14,
+    left: 68,
+    letterSpacing: -0.28,
+    position: "absolute",
+    top: 21,
+  },
+  experienceTrack: {
+    backgroundColor: "#E5E5E5",
+    borderRadius: 7,
+    height: 5,
+    left: 22,
+    overflow: "hidden",
+    position: "absolute",
+    top: 64,
+    width: 209,
+  },
+  photoViewerClose: {
+    alignItems: "center",
+    height: 32,
+    justifyContent: "center",
+    width: 44,
+  },
+  photoViewerCloseIcon: {
+    height: 24,
+    width: 24,
+  },
+  photoViewerBody: {
+    flex: 1,
+    gap: 12,
+    minHeight: 0,
+    paddingVertical: 12,
+  },
+  photoViewerFooter: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+  },
+  photoViewerHeader: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    zIndex: 2,
+    ...shadows.raised,
+  },
+  photoViewerHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    height: 56,
+    paddingHorizontal: 12,
+  },
+  photoViewerHeaderSide: {
+    width: 44,
+  },
+  photoViewerHint: {
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 32,
+    bottom: 16,
+    paddingHorizontal: 19,
+    paddingVertical: 8,
+    position: "absolute",
+  },
+  photoViewerHintText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.regular,
+    fontSize: 14,
+  },
+  photoViewerImage: {
+    height: "100%",
+    resizeMode: "cover",
+    width: "100%",
+  },
+  photoViewerImageWrap: {
+    backgroundColor: "#101010",
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+  },
+  photoViewerMetricUnit: {
+    fontFamily: fontFamilies.giantsRegular,
+    fontSize: 18,
+  },
+  photoViewerMetricValue: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.giantsRegular,
+    fontSize: 32,
+    letterSpacing: -0.64,
+  },
+  photoViewerMetrics: {
+    bottom: 24,
+    gap: 10,
+    left: 24,
+    position: "absolute",
+  },
+  photoViewerRoot: {
+    backgroundColor: "#1A1A1A",
+    flex: 1,
+  },
+  photoViewerRoute: {
+    height: 120,
+    position: "absolute",
+    right: 16,
+    top: 16,
+    width: 116,
+  },
+  photoViewerSave: {
+    alignItems: "center",
+    backgroundColor: "#404040",
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 12,
+    height: 54,
+    justifyContent: "center",
+  },
+  photoViewerSaveIcon: {
+    height: 24,
+    width: 24,
+  },
+  photoViewerSaveText: {
+    color: "#FAFAFA",
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 17,
+    letterSpacing: -0.34,
+  },
+  photoViewerThumb: {
+    height: "100%",
+    resizeMode: "cover",
+    width: "100%",
+  },
+  photoViewerThumbSelected: {
+    borderColor: "#FF8A00",
+    borderWidth: 3,
+  },
+  photoViewerThumbWrap: {
+    borderRadius: 3,
+    height: 61,
+    overflow: "hidden",
+    width: 52,
+  },
+  photoViewerThumbs: {
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 61,
+  },
+  photoViewerTitle: {
+    color: "#FAFAFA",
+    flex: 1,
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 18,
+    letterSpacing: -0.36,
+    textAlign: "center",
   },
 });

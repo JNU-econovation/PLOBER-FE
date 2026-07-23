@@ -13,6 +13,7 @@ import { caloriesFromSteps } from "../services/calculate-calories";
 type PloggingSessionContextValue = {
   // 누적 데이터
   mode: PloggingMode;
+  sessionKey: string | null;
   startedAtMs: number | null;
   finishedAtMs: number | null;
   restSeconds: number;
@@ -32,19 +33,21 @@ type PloggingSessionContextValue = {
 
   // 변경 액션
   setMode: (mode: PloggingMode) => void;
-  startSession: () => void;
-  finishSession: (restSeconds: number) => void;
+  startSession: (startedAtMs?: number, sessionKey?: string) => void;
+  finishSession: (restSeconds: number, finishedAtMs?: number) => void;
   addPhoto: (uri: string) => void;
   removePhoto: (uri: string) => void;
   addPhotoObjectUrl: (localUri: string, objectUrl: string) => void;
   appendRoutePoint: (point: RoutePoint) => void;
   addSteps: (delta: number) => void;
+  replaceStepCount: (stepCount: number) => void;
   setRecommendedRoutePoints: (points: RoutePoint[]) => void;
   setPlaceName: (name: string) => void;
   setMapImageUri: (uri: string | null) => void;
   setMapImageObjectUrl: (url: string | null) => void;
   resetSession: (options?: { preserveRecommendedRoute?: boolean }) => void;
   appendRoutePoints: (points: RoutePoint[]) => void;
+  replaceRoutePoints: (points: RoutePoint[], distanceMeters?: number) => void;
 };
 
 const PloggingSessionContext =
@@ -52,6 +55,7 @@ const PloggingSessionContext =
 
 export function PloggingSessionProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<PloggingMode>("FREE");
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
   const [finishedAtMs, setFinishedAtMs] = useState<number | null>(null);
   const [restSeconds, setRestSeconds] = useState(0);
@@ -139,9 +143,28 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
     [appendRoutePoints]
   );
 
+  const replaceRoutePoints = useCallback(
+    (points: RoutePoint[], nextDistanceMeters?: number) => {
+      const nextPoints = [...points];
+      setRoutePoints(nextPoints);
+      setDistanceMeters(
+        nextDistanceMeters === undefined
+          ? calculateRouteDistance(nextPoints)
+          : Math.max(0, nextDistanceMeters)
+      );
+      setStartCoord(nextPoints[0] ?? null);
+      setEndCoord(nextPoints[nextPoints.length - 1] ?? null);
+    },
+    []
+  );
+
   const addSteps = useCallback((delta: number) => {
     if (delta <= 0) return;
     setStepCount((prev) => prev + delta);
+  }, []);
+
+  const replaceStepCount = useCallback((nextStepCount: number) => {
+    setStepCount(Math.max(0, Math.floor(nextStepCount)));
   }, []);
 
   const setRecommendedRoutePoints = useCallback((points: RoutePoint[]) => {
@@ -165,16 +188,25 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 세션 시작 시각 고정. 같은 세션 내 재호출은 무시한다.
-  const startSession = useCallback(() => {
-    setStartedAtMs((prev) => (prev !== null ? prev : Date.now()));
+  const startSession = useCallback((
+    nextStartedAtMs = Date.now(),
+    nextSessionKey?: string,
+  ) => {
+    setSessionKey(nextSessionKey ?? String(nextStartedAtMs));
+    setStartedAtMs((prev) =>
+      prev !== null ? prev : Math.min(Date.now(), nextStartedAtMs)
+    );
     setFinishedAtMs(null);
   }, []);
 
   // 종료 시각과 누적 휴식 시간 확정.
-  const finishSession = useCallback((nextRestSeconds: number) => {
-    setFinishedAtMs(Date.now());
-    setRestSeconds(Math.max(0, Math.floor(nextRestSeconds)));
-  }, []);
+  const finishSession = useCallback(
+    (nextRestSeconds: number, nextFinishedAtMs = Date.now()) => {
+      setFinishedAtMs(nextFinishedAtMs);
+      setRestSeconds(Math.max(0, Math.floor(nextRestSeconds)));
+    },
+    []
+  );
 
   const resetSession = useCallback(
     (options?: { preserveRecommendedRoute?: boolean }) => {
@@ -191,6 +223,7 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       setPlaceNameState("");
       setMapImageUriState(null);
       setMapImageObjectUrlState(null);
+      setSessionKey(null);
       setStartedAtMs(null);
       setFinishedAtMs(null);
       setRestSeconds(0);
@@ -218,9 +251,12 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       placeName,
       recommendedRoutePoints,
       removePhoto,
+      replaceStepCount,
+      replaceRoutePoints,
       resetSession,
       restSeconds,
       routePoints,
+      sessionKey,
       setMapImageObjectUrl,
       setMapImageUri,
       setMode,
@@ -249,9 +285,12 @@ export function PloggingSessionProvider({ children }: { children: ReactNode }) {
       placeName,
       recommendedRoutePoints,
       removePhoto,
+      replaceStepCount,
+      replaceRoutePoints,
       resetSession,
       restSeconds,
       routePoints,
+      sessionKey,
       setMapImageObjectUrl,
       setMapImageUri,
       setMode,
@@ -298,6 +337,14 @@ function haversineMeters(a: RoutePoint, b: RoutePoint): number {
   const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 
   return EARTH_RADIUS_METERS * c;
+}
+
+function calculateRouteDistance(points: RoutePoint[]): number {
+  let distance = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    distance += haversineMeters(points[index - 1], points[index]);
+  }
+  return distance;
 }
 
 function toRadians(degrees: number): number {

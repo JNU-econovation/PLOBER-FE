@@ -15,10 +15,9 @@ export type GetPloggingSessionsResponse = {
 };
 
 export type GetPloggingSessionsRequest = {
-  page: number;
-  size: number;
+  page?: number;
+  size?: number;
   sort?: string[];
-  userId: number;
 };
 
 export type PloggingSessionDetail = {
@@ -38,11 +37,9 @@ export type PloggingSessionDetail = {
 
 export type GetPloggingSessionRequest = {
   ploggingSessionId: number;
-  userId: number;
 };
 
 export type GetMonthlyPloggingSummaryRequest = {
-  userId: number;
   year: number;
   month: number;
 };
@@ -68,7 +65,6 @@ export type DayOfWeek =
 
 export type GetWeeklyPloggingSummaryRequest = {
   startDate: string;
-  userId: number;
 };
 
 export type DailyPloggingStat = {

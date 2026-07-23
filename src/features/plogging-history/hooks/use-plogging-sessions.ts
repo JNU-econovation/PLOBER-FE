@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 
 import { useAuthSession } from "@/src/features/auth";
 
@@ -18,43 +19,44 @@ export function usePloggingSessions(): PloggingSessionsState {
   const { session, status: authStatus } = useAuthSession();
   const [state, setState] = useState<PloggingSessionsState>({ status: "idle" });
 
-  useEffect(() => {
-    if (authStatus !== "authenticated" || !session?.userId) {
-      setState({ status: "idle" });
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      if (authStatus !== "authenticated" || !session?.userId) {
+        setState({ status: "idle" });
+        return;
+      }
 
-    let mounted = true;
-    setState({ status: "loading" });
+      let mounted = true;
+      setState({ status: "loading" });
 
-    getPloggingSessions({
-      page: DEFAULT_PAGE,
-      size: DEFAULT_PAGE_SIZE,
-      userId: session.userId,
-    })
-      .then((response) => {
-        if (!mounted) return;
-        setState({
-          status: "success",
-          sessions: response.content,
-          hasNext: response.hasNext,
-        });
+      getPloggingSessions({
+        page: DEFAULT_PAGE,
+        size: DEFAULT_PAGE_SIZE,
       })
-      .catch((error) => {
-        if (!mounted) return;
-        setState({
-          status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "플로깅 기록을 불러오지 못했습니다.",
+        .then((response) => {
+          if (!mounted) return;
+          setState({
+            status: "success",
+            sessions: response.content,
+            hasNext: response.hasNext,
+          });
+        })
+        .catch((error) => {
+          if (!mounted) return;
+          setState({
+            status: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "플로깅 기록을 불러오지 못했습니다.",
+          });
         });
-      });
 
-    return () => {
-      mounted = false;
-    };
-  }, [authStatus, session?.userId]);
+      return () => {
+        mounted = false;
+      };
+    }, [authStatus, session?.userId]),
+  );
 
   return state;
 }
